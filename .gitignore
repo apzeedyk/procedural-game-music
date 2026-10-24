@@ -1,0 +1,21 @@
+# Build output
+target/
+
+# Generated music
+*.mid
+*.wav
+*-tracklist.txt
+
+# SoundFonts are large and separately licensed
+*.sf2
+*.sf3
+
+# IDEs and OS
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+.DS_Store
+Thumbs.db
