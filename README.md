@@ -36,6 +36,14 @@ mvn package
 
 This builds `target/jazzerator.jar` and runs the test suite.
 
+## Desktop app
+
+```sh
+java -jar target/jazzerator.jar --gui
+```
+
+Pick a seed, genre, pairing, form, instruments and sound engine; generate; see the song as a piano roll with chord names; play it; and export MIDI or WAV. The app uses the same pipeline as the command line, so the same settings give the same song.
+
 ## Usage
 
 ```sh

@@ -18,6 +18,10 @@ import javax.sound.sampled.AudioSystem;
 
 public final class Main {
     public static void main(String[] args) throws Exception {
+        if (args.length == 1 && args[0].equals("--gui")) {
+            com.jazzerator.gui.JazzeratorApp.launch();
+            return;
+        }
         Cli cli;
         try {
             cli = Cli.parse(args);

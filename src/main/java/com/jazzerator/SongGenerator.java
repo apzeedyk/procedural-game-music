@@ -22,8 +22,14 @@ public final class SongGenerator {
     }
 
     public static Song generate(long seed, GenrePreset forcedGenre, Structure forcedStructure) {
+        return generate(seed, forcedGenre, forcedStructure, null);
+    }
+
+    /** As above, optionally forcing a specific pairing. */
+    public static Song generate(long seed, GenrePreset forcedGenre, Structure forcedStructure,
+                                com.jazzerator.preset.Pairing forcedPairing) {
         Rng rng = new Rng(seed);
-        SongSpec spec = SongSpec.random(rng, forcedGenre, forcedStructure);
+        SongSpec spec = SongSpec.random(rng, forcedGenre, forcedStructure, forcedPairing);
         List<Section> sections = HarmonyPlanner.plan(spec, rng);
         List<MelodyNote> plain = MelodyPlanner.followHarmony(MelodyPlanner.plan(spec, sections, rng), sections,
                 spec.key().scale());

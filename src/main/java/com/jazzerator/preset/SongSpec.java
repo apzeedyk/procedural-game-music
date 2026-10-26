@@ -29,9 +29,19 @@ public record SongSpec(
      * structure replaces the picked one after all random draws, so every other choice for the seed is unchanged.
      */
     public static SongSpec random(Rng rng, GenrePreset forcedGenre, Structure forcedStructure) {
+        return random(rng, forcedGenre, forcedStructure, null);
+    }
+
+    /**
+     * As above, optionally forcing a specific pairing (its genre is implied). Forcing a choice never changes the
+     * dice for the others, because each choice has its own random stream.
+     */
+    public static SongSpec random(Rng rng, GenrePreset forcedGenre, Structure forcedStructure, Pairing forcedPairing) {
         // Each choice has its own random stream, so changing one table never reshuffles the others.
-        GenrePreset genre = forcedGenre != null ? forcedGenre : weightedGenre(rng.fork("genre"));
-        Pairing p = weightedPairing(rng.fork("pairing", genre.id()), genre.pairings());
+        GenrePreset genre = forcedPairing != null ? genreOf(forcedPairing)
+                : forcedGenre != null ? forcedGenre : weightedGenre(rng.fork("genre"));
+        Pairing p = forcedPairing != null ? forcedPairing
+                : weightedPairing(rng.fork("pairing", genre.id()), genre.pairings());
         Key key = new Key(Note.parse(p.tonics().pick(rng.fork("tonic"))), p.modes().pick(rng.fork("mode")));
         Structure structure = forcedStructure != null ? forcedStructure : p.structures().pick(rng.fork("structure"));
         return new SongSpec(
@@ -73,6 +83,12 @@ public record SongSpec(
                         + (instruments.hasHarmony() ? " + " + Instruments.name(instruments.harmony()) + " (3rds)" : "")
                         + " / " + Instruments.name(instruments.comp()) + " / " + Instruments.name(instruments.bass()),
                 "Groove:    " + pairing.groove().displayName());
+    }
+
+    /** The genre a pairing belongs to. */
+    public static GenrePreset genreOf(Pairing pairing) {
+        return Presets.ALL.stream().filter(g -> g.pairings().contains(pairing)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown pairing " + pairing.name()));
     }
 
     private static GenrePreset weightedGenre(Rng rng) {

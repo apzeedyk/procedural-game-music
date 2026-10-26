@@ -85,6 +85,7 @@ record Cli(
               --ffmpeg <path>     ffmpeg executable (default: ffmpeg on the PATH)
               --list              List genres and their pairings
               --help              Show this help
+              --gui               Open the desktop app instead (no other options)
             """.formatted(
             Presets.ALL.stream().map(GenrePreset::id).collect(Collectors.joining(", ")),
             Arrays.stream(Structure.values()).map(Structure::id).collect(Collectors.joining(", ")));

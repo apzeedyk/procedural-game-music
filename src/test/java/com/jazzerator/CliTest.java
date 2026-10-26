@@ -91,4 +91,14 @@ class CliTest {
         assertEquals(song.melody(), changed.melody());    // composition untouched
         assertEquals(song.sections(), changed.sections());
     }
+
+    @Test
+    void forcingAPairingKeepsTheSeedsOtherChoices() {
+        var heroic = Presets.byId("overworld").orElseThrow().pairings().get(0);
+        for (long seed = 0; seed < 50; seed++) {
+            var forced = SongGenerator.generate(seed, null, null, heroic).spec();
+            assertEquals(heroic, forced.pairing());
+            assertEquals("overworld", forced.genre().id());
+        }
+    }
 }
