@@ -45,8 +45,11 @@ public final class Presets {
                             .progressions(Weighted.of("I V vi IV", 3.0).and("I IV V IV", 2.0)
                                     .and("I vi IV V", 2.0).and("I iii IV V", 1.0).and("IV V iii vi", 1.0))
                             .structures(Weighted.of(AABA, 2.0).and(VERSE_CHORUS, 2.0).and(INTRO_LOOP_OUTRO, 1.0))
-                            .instruments(new Instruments(TRUMPET, STRINGS, FINGER_BASS),
-                                    new Instruments(FRENCH_HORN, STRINGS, ACOUSTIC_BASS))
+                            .instruments(Weighted.of(new Instruments(BRASS, STRINGS, ACOUSTIC_BASS), 3.0)
+                                    .and(new Instruments(BRASS, STRINGS, FINGER_BASS, TROMBONE), 2.0)
+                                    .and(new Instruments(BRASS, STRINGS, FINGER_BASS, FRENCH_HORN), 0.5)
+                                    .and(new Instruments(TRUMPET, STRINGS, FINGER_BASS, FRENCH_HORN), 0.5)
+                                    .and(new Instruments(FRENCH_HORN, STRINGS, ACOUSTIC_BASS, TROMBONE), 0.25))
                             .groove(Groove.MARCH)
                             .build(),
                     pairing("Pastoral fields", 2)
@@ -72,8 +75,9 @@ public final class Presets {
                             .progressions(Weighted.of("I bVII IV I", 3.0).and("I v bVII IV", 1.0)
                                     .and("I bVII I bVII", 1.0))
                             .structures(Weighted.of(VERSE_CHORUS, 1.0).and(ABAB, 1.0).and(INTRO_LOOP_OUTRO, 1.0))
-                            .instruments(new Instruments(BRASS, OVERDRIVE_GUITAR, FINGER_BASS),
-                                    new Instruments(TRUMPET, PIANO, FINGER_BASS))
+                            .instruments(Weighted.of(new Instruments(BRASS, OVERDRIVE_GUITAR, FINGER_BASS), 3.0)
+                                    .and(new Instruments(BRASS, PIANO, FINGER_BASS, TROMBONE), 1.5)
+                                    .and(new Instruments(TRUMPET, PIANO, FINGER_BASS, FRENCH_HORN), 0.5))
                             .groove(Groove.ROCK)
                             .build())),
 
@@ -117,7 +121,7 @@ public final class Presets {
                             .progressions(Weighted.of("i bII i bVII", 3.0).and("i bVI bVII i", 2.0)
                                     .and("i bII bIII bII", 1.0))
                             .structures(Weighted.of(INTRO_LOOP_OUTRO, 2.0).and(ABAB, 1.0).and(AABA, 1.0))
-                            .instruments(new Instruments(DISTORTION_GUITAR, BRASS, SYNTH_BASS),
+                            .instruments(new Instruments(DISTORTION_GUITAR, BRASS, SYNTH_BASS, DISTORTION_GUITAR),
                                     new Instruments(SAW_LEAD, DISTORTION_GUITAR, SYNTH_BASS))
                             .harmony(HarmonyStyle.POWER)
                             .ornaments(OrnamentStyle.SHRED)
@@ -132,7 +136,7 @@ public final class Presets {
                                     .and("i viio7 i V", 1.0))
                             .structures(Weighted.of(AABA, 1.0).and(INTRO_LOOP_OUTRO, 1.0).and(RONDO, 1.0))
                             .instruments(new Instruments(CHURCH_ORGAN, CHOIR, SYNTH_BASS),
-                                    new Instruments(STRINGS, CHURCH_ORGAN, FINGER_BASS))
+                                    new Instruments(BRASS, CHURCH_ORGAN, FINGER_BASS))
                             .harmony(HarmonyStyle.POWER)
                             .ornaments(OrnamentStyle.SHRED)
                             .groove(Groove.DRIVING)
@@ -178,7 +182,7 @@ public final class Presets {
                                     .and("I bVI bVII I", 1.0).and("I IV V I", 1.0))
                             .structures(Weighted.of(INTRO_LOOP_OUTRO, 2.0).and(VERSE_CHORUS, 1.0).and(AABA, 1.0))
                             .instruments(new Instruments(SQUARE_LEAD, SQUARE_LEAD, SYNTH_BASS),
-                                    new Instruments(SQUARE_LEAD, SAW_LEAD, SYNTH_BASS))
+                                    new Instruments(SQUARE_LEAD, SAW_LEAD, SYNTH_BASS, SQUARE_LEAD))
                             .harmony(HarmonyStyle.POWER)
                             .ornaments(OrnamentStyle.CHIP)
                             .groove(Groove.CHIP)
@@ -300,7 +304,7 @@ public final class Presets {
         private Weighted<Integer> sectionBars = MOSTLY_EIGHT_BARS;
         private Weighted<String> progressions;
         private Weighted<Structure> structures;
-        private List<Instruments> instruments;
+        private Weighted<Instruments> instruments;
         private HarmonyStyle harmony = HarmonyStyle.DEFAULT;
         private OrnamentStyle ornaments = OrnamentStyle.DEFAULT;
         private Groove groove = Groove.ROCK;
@@ -317,7 +321,8 @@ public final class Presets {
         Builder beats(Weighted<Integer> v) { beats = v; return this; }
         Builder progressions(Weighted<String> v) { progressions = v; return this; }
         Builder structures(Weighted<Structure> v) { structures = v; return this; }
-        Builder instruments(Instruments... v) { instruments = List.of(v); return this; }
+        Builder instruments(Instruments... v) { instruments = Weighted.uniform(v); return this; }
+        Builder instruments(Weighted<Instruments> v) { instruments = v; return this; }
         Builder harmony(HarmonyStyle v) { harmony = v; return this; }
         Builder ornaments(OrnamentStyle v) { ornaments = v; return this; }
         Builder groove(Groove v) { groove = v; return this; }

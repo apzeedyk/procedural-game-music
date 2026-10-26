@@ -9,6 +9,7 @@ target/
 # SoundFonts are large and separately licensed
 *.sf2
 *.sf3
+soundfonts/
 
 # IDEs and OS
 .idea/
@@ -19,3 +20,8 @@ target/
 .classpath
 .DS_Store
 Thumbs.db
+
+# Rendered demos and compilations
+out/
+*.mp4
+*.ass

@@ -27,7 +27,7 @@ class OrnamenterTest {
     }
 
     private static List<MelodyNote> orn(List<MelodyNote> plain, OrnamentStyle style) {
-        return Ornamenter.ornament(plain, style, C, 120, 4, Feel.STRAIGHT, new Rng(1));
+        return Ornamenter.ornament(plain, style, C, 120, 4, Feel.STRAIGHT, new Rng(1), null);
     }
 
     @Test
@@ -86,7 +86,7 @@ class OrnamenterTest {
             long ticksPerBar = (long) PPQ * spec.beatsPerBar();
             for (OrnamentStyle style : new OrnamentStyle[]{EVERYTHING, OrnamentStyle.SHRED, OrnamentStyle.JAZZY}) {
                 List<MelodyNote> out = Ornamenter.ornament(plain, style, spec.key(), spec.tempo(),
-                        spec.beatsPerBar(), spec.feel(), new Rng(seed));
+                        spec.beatsPerBar(), spec.feel(), new Rng(seed), sections);
                 long lastEnd = 0;
                 for (MelodyNote n : out) {
                     assertTrue(n.durationTicks() > 0, "seed " + seed);

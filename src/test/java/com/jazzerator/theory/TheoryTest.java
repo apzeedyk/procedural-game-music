@@ -110,4 +110,16 @@ class TheoryTest {
             assertTrue(v[i] > v[i - 1]);
         }
     }
+
+    @Test
+    void scaleAdaptsToChromaticChordTones() {
+        Scale aMixolydian = Key.of("A", Mode.MIXOLYDIAN).scale();
+        Chord e7 = Key.of("A", Mode.MIXOLYDIAN).chord("V7"); // E G# B D
+        Scale overE7 = aMixolydian.forChord(e7);
+        assertTrue(overE7.contains(Note.parse("G#")));
+        assertFalse(overE7.contains(Note.parse("G")));
+        assertEquals(Note.parse("G#") + 60, overE7.step(Note.parse("F#") + 60, 1)); // F# steps up to G#, not G
+        Chord diatonic = Key.of("A", Mode.MIXOLYDIAN).chord("bVII"); // G major is in the key
+        assertTrue(aMixolydian.forChord(diatonic) == aMixolydian);
+    }
 }

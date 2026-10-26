@@ -20,7 +20,10 @@ record Cli(
         boolean list,
         File soundfont,
         boolean wav,
-        double compilationMinutes) {
+        double compilationMinutes,
+        File video,
+        double fps,
+        String ffmpeg) {
 
     static final String USAGE = """
             Usage: java -jar jazzerator.jar [options]
@@ -38,6 +41,10 @@ record Cli(
               --soundfont <file>  Use a SoundFont (.sf2) for playback and rendering
               --compilation <min> Render consecutive songs into one WAV of at least <min> minutes,
                                   plus a tracklist with YouTube chapter timestamps
+              --video <path>      With --compilation: also make an MP4 over a looping background
+                                  (a folder of numbered PNG frames, or a single image)
+              --fps <n>           Background animation frame rate (default: 12)
+              --ffmpeg <path>     ffmpeg executable (default: ffmpeg on the PATH)
               --list              List genres and their pairings
               --help              Show this help
             """.formatted(
@@ -62,6 +69,9 @@ record Cli(
         File soundfont = null;
         boolean wav = false;
         double compilationMinutes = 0;
+        File video = null;
+        double fps = 12;
+        String ffmpeg = "ffmpeg";
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             switch (arg) {
@@ -91,6 +101,24 @@ record Cli(
                         throw new UsageException("SoundFont not found: " + soundfont);
                     }
                 }
+                case "--video" -> {
+                    video = new File(value(args, ++i, arg));
+                    if (!video.exists()) {
+                        throw new UsageException("Video background not found: " + video);
+                    }
+                }
+                case "--fps" -> {
+                    String v = value(args, ++i, arg);
+                    try {
+                        fps = Double.parseDouble(v);
+                    } catch (NumberFormatException e) {
+                        throw new UsageException("--fps expects a number, got '" + v + "'.");
+                    }
+                    if (fps <= 0) {
+                        throw new UsageException("--fps must be positive.");
+                    }
+                }
+                case "--ffmpeg" -> ffmpeg = value(args, ++i, arg);
                 case "--compilation" -> {
                     String v = value(args, ++i, arg);
                     try {
@@ -106,7 +134,11 @@ record Cli(
                 default -> throw new UsageException("Unknown option '" + arg + "'.");
             }
         }
-        return new Cli(seed, genre, structure, count, play, out, help, list, soundfont, wav, compilationMinutes);
+        if (video != null && compilationMinutes <= 0) {
+            throw new UsageException("--video needs --compilation <minutes>.");
+        }
+        return new Cli(seed, genre, structure, count, play, out, help, list, soundfont, wav, compilationMinutes,
+                video, fps, ffmpeg);
     }
 
     /** Output path for the n-th song (0-based) of a batch. */

@@ -34,8 +34,29 @@ class PresetsTest {
             assertTrue(p.beatsPerBar().items().contains(s.beatsPerBar()));
             assertTrue(p.sectionBars().items().contains(s.sectionBars()));
             assertTrue(p.structures().items().contains(s.structure()));
-            assertTrue(p.instruments().contains(s.instruments()));
+            assertTrue(p.instruments().items().contains(s.instruments()));
         }
+    }
+
+    /** Solo brass leads sound thin, so they're rare in the march pairing, but still possible for variety. */
+    @Test
+    void heroicMarchFavorsBrassSectionButKeepsSoloLeadsPossible() {
+        GenrePreset overworld = Presets.byId("overworld").orElseThrow();
+        int marches = 0;
+        int solo = 0;
+        for (long seed = 0; seed < 4000; seed++) {
+            SongSpec s = SongSpec.random(new Rng(seed), overworld);
+            if (!s.pairing().name().equals("Heroic march")) {
+                continue;
+            }
+            marches++;
+            int lead = s.instruments().lead();
+            if (lead == Instruments.TRUMPET || lead == Instruments.FRENCH_HORN) {
+                solo++;
+            }
+        }
+        double share = solo / (double) marches;
+        assertTrue(share > 0.05 && share < 0.3, "solo brass share " + share);
     }
 
     @Test

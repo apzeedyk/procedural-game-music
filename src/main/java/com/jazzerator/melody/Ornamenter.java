@@ -1,13 +1,16 @@
 package com.jazzerator.melody;
 
+import com.jazzerator.form.Section;
 import com.jazzerator.midi.MidiWriter;
 import com.jazzerator.preset.Feel;
 import com.jazzerator.preset.SongSpec;
+import com.jazzerator.theory.Chord;
 import com.jazzerator.theory.Key;
 import com.jazzerator.theory.Scale;
 import com.jazzerator.util.Rng;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.LongFunction;
 
 /**
  * Embellishes a plain melody with runs, trills, passing and neighbor tones, grace notes, repeated notes, merged
@@ -23,12 +26,21 @@ public final class Ornamenter {
 
     public static List<MelodyNote> ornament(List<MelodyNote> plain, SongSpec spec, Rng rng) {
         return ornament(plain, spec.pairing().ornaments(), spec.key(), spec.tempo(), spec.beatsPerBar(), spec.feel(),
-                rng);
+                rng, null);
     }
 
+    public static List<MelodyNote> ornament(List<MelodyNote> plain, SongSpec spec, List<Section> sections, Rng rng) {
+        return ornament(plain, spec.pairing().ornaments(), spec.key(), spec.tempo(), spec.beatsPerBar(), spec.feel(),
+                rng, sections);
+    }
+
+    /**
+     * @param sections the song's harmony, so ornaments follow chromatic chord tones; null uses the plain key scale
+     */
     public static List<MelodyNote> ornament(List<MelodyNote> plain, OrnamentStyle style, Key key, int tempo,
-                                            int beatsPerBar, Feel feel, Rng rng) {
-        Scale scale = key.scale();
+                                            int beatsPerBar, Feel feel, Rng rng, List<Section> sections) {
+        Scale keyScale = key.scale();
+        LongFunction<Scale> scaleAt = tick -> sections == null ? keyScale : keyScale.forChord(chordAt(sections, tick));
         long ticksPerBar = PPQ * beatsPerBar;
         // Runs move in 16ths, or 8th-note triplets under a swing feel.
         long runUnit = feel == Feel.SWING || feel == Feel.SHUFFLE ? PPQ / 3 : PPQ / 4;
@@ -41,7 +53,7 @@ public final class Ornamenter {
             MelodyNote next = i + 1 < plain.size() ? plain.get(i + 1) : null;
 
             if (rng.chance(style.grace())) {
-                addGrace(out, n, scale, rng.chance(0.5));
+                addGrace(out, n, scaleAt.apply(n.startTick()), rng.chance(0.5));
             }
             if (next != null && next.startTick() == n.endTick()
                     && !MelodyPlanner.isStrongBeat(next.startTick(), ticksPerBar, beatsPerBar)
@@ -53,18 +65,24 @@ public final class Ornamenter {
                 continue;
             }
 
+            // Ornaments that add pitches stay under one chord: a trill or run computed for one chord clashes
+            // with the next (Bb trilling against an E7's B natural).
+            boolean steady = sameChord(sections, n.startTick(), n.endTick() - 1);
+            boolean runSteady = next != null && sameChord(sections, n.startTick(), next.startTick() - 1);
+
             List<MelodyNote> result = null;
-            if (next != null && rng.chance(style.run())) {
-                result = run(n, next, scale, runUnit, ticksPerBar, rng);
+            if (runSteady && rng.chance(style.run())) {
+                result = run(n, next, scaleAt.apply(next.startTick() - 1), runUnit, ticksPerBar, rng);
             }
-            if (result == null && rng.chance(style.trill())) {
-                result = trill(n, scale, trillUnit);
+            if (result == null && steady && rng.chance(style.trill())) {
+                result = trill(n, scaleAt.apply(n.startTick()), trillUnit);
             }
-            if (result == null && next != null && rng.chance(style.passing())) {
-                result = passing(n, next, scale, rng.chance(style.chromatic()));
+            if (result == null && steady && next != null && rng.chance(style.passing())) {
+                result = passing(n, next, scaleAt.apply(n.startTick() + n.durationTicks() / 2), keyScale,
+                        rng.chance(style.chromatic()));
             }
-            if (result == null && rng.chance(style.neighbor())) {
-                result = neighbor(n, scale, rng.chance(0.5));
+            if (result == null && steady && rng.chance(style.neighbor())) {
+                result = neighbor(n, scaleAt.apply(n.startTick() + n.durationTicks() / 2), rng.chance(0.5));
             }
             if (result == null && rng.chance(style.split())) {
                 result = split(n);
@@ -156,7 +174,8 @@ public final class Ornamenter {
     }
 
     /** Second half of the note becomes the tone between it and the next note (diatonic, or chromatic). */
-    private static List<MelodyNote> passing(MelodyNote n, MelodyNote next, Scale scale, boolean chromatic) {
+    private static List<MelodyNote> passing(MelodyNote n, MelodyNote next, Scale scale, Scale keyScale,
+                                            boolean chromatic) {
         if (n.durationTicks() < PPQ) {
             return null;
         }
@@ -172,6 +191,9 @@ public final class Ornamenter {
         }
         if (pitch == n.pitch() || pitch == next.pitch()) {
             return null;
+        }
+        if (keyScale.contains(pitch) && !scale.contains(pitch)) {
+            return null; // the chord altered this note (G# in E7), so the key's version (G) would clash
         }
         long half = n.durationTicks() / 2;
         return List.of(
@@ -223,6 +245,20 @@ public final class Ornamenter {
             steps++;
         }
         return steps;
+    }
+
+    private static boolean sameChord(List<Section> sections, long from, long to) {
+        return sections == null || chordAt(sections, from).equals(chordAt(sections, to));
+    }
+
+    private static Chord chordAt(List<Section> sections, long tick) {
+        for (Section s : sections) {
+            if (tick >= s.startTick() && tick < s.endTick()) {
+                return MelodyPlanner.chordAt(s, tick);
+            }
+        }
+        Section last = sections.get(sections.size() - 1);
+        return MelodyPlanner.chordAt(last, last.endTick() - 1);
     }
 
     private static boolean sameBar(long a, long b, long ticksPerBar) {

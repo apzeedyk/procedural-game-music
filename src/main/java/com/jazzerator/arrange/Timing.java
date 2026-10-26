@@ -33,16 +33,20 @@ final class Timing {
         return beat * PPQ + mapped;
     }
 
-    /** Section dynamics: quieter intros, louder contrasting sections, and an outro that fades. */
+    /**
+     * Section dynamics: a slightly quieter intro, a gentle lift for contrasting sections, and an outro that fades.
+     * Kept subtle on purpose: sampled instruments (piano especially) switch to brighter velocity layers, so a large
+     * jump makes the accompaniment lurch forward instead of just getting a little louder.
+     */
     double dynamics(long tick) {
         for (Section s : song.sections()) {
             if (tick >= s.startTick() && tick < s.endTick()) {
                 return switch (s.label()) {
-                    case "Intro" -> 0.78;
-                    case "B", "Chorus", "Bridge" -> 1.06;
-                    case "C" -> 0.96;
-                    case "Outro" -> 0.95 - 0.3 * (tick - s.startTick()) / (double) (s.endTick() - s.startTick());
-                    default -> 0.92;
+                    case "Intro" -> 0.88;
+                    case "B", "Chorus", "Bridge" -> 1.0;
+                    case "C" -> 0.97;
+                    case "Outro" -> 0.95 - 0.25 * (tick - s.startTick()) / (double) (s.endTick() - s.startTick());
+                    default -> 0.95;
                 };
             }
         }

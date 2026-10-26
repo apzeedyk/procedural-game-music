@@ -66,6 +66,9 @@ java -jar target/jazzerator.jar --list
 | `--wav` | Also render each song to WAV |
 | `--soundfont <file.sf2>` | Use a SoundFont for playback and rendering |
 | `--compilation <minutes>` | Render consecutive songs into one WAV plus a chapter tracklist |
+| `--video <frames-or-image>` | With `--compilation`: also make an MP4 over a looping background |
+| `--fps <n>` | Background animation frame rate (default 12) |
+| `--ffmpeg <path>` | ffmpeg executable (default: `ffmpeg` on the PATH) |
 
 Each run prints the song's settings and a chord chart:
 
@@ -81,7 +84,20 @@ Groove:    Driving
 
 ## SoundFonts
 
-The JDK's built-in synthesizer works, but a good General MIDI SoundFont sounds much better. Free options include [GeneralUser GS](https://schristiancollins.com/generaluser.php) and FluidR3_GM. SoundFonts have their own licenses and are not part of this project.
+The JDK's built-in synthesizer works, but a good General MIDI SoundFont sounds much better. Free options include [GeneralUser GS](https://schristiancollins.com/generaluser.php) and FluidR3_GM. SoundFonts have their own licenses and are not part of this project. Put one in `soundfonts/` (git-ignored) and pass `--soundfont soundfonts/GeneralUser-GS.sf2`.
+
+## Videos
+
+With [ffmpeg](https://ffmpeg.org/) installed, `--video` turns a compilation into a YouTube-ready MP4:
+
+```sh
+java -jar target/jazzerator.jar --genre overworld --compilation 60     --soundfont soundfonts/GeneralUser-GS.sf2 --video path/to/background-frames
+```
+
+- The background can be a folder of numbered PNG frames (`frame0000.png`, ...) or a single image. It loops for the whole mix and is scaled to 1080p with nearest-neighbor, so pixel art stays crisp.
+- A "now playing" caption (genre, pairing, key, tempo, seed) is burned in and changes at each chapter.
+- The tracklist file holds YouTube chapter timestamps for the description.
+- Check that the background's license allows your use, and credit the artist.
 
 ## How it works
 

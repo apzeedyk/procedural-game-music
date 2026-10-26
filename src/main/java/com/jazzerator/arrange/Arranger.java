@@ -1,21 +1,30 @@
 package com.jazzerator.arrange;
 
 import com.jazzerator.form.Song;
+import com.jazzerator.melody.Harmonizer;
 import com.jazzerator.melody.MelodyNote;
 import com.jazzerator.midi.MidiWriter;
+import com.jazzerator.preset.Instruments;
 import com.jazzerator.preset.SongSpec;
 import com.jazzerator.util.Rng;
+import java.util.ArrayList;
+import java.util.List;
 import javax.sound.midi.Sequence;
 import javax.sound.midi.Track;
 
-/** Renders a Song to MIDI. Channels: 0 lead, 1 comp, 2 bass, 9 drums. */
+/** Renders a Song to MIDI. Channels: 0 lead, 1 comp, 2 bass, 3 lead harmony, 9 drums. */
 public final class Arranger {
     public static final int LEAD = 0;
     public static final int COMP = 1;
     public static final int BASS = 2;
+    public static final int HARMONY = 3;
     public static final int DRUMS = DrumPart.CHANNEL;
 
     private static final double LEGATO = 0.92;
+    /** Louder brass samples are brighter with a harder attack, which is what makes brass punch. */
+    private static final int BRASS_PUNCH = 14;
+    private static final int REVERB = 91; // GM effect send controllers
+    private static final int CHORUS = 93;
     private static final long PERFORMANCE_SALT = 0x5EED_CAFEL;
 
     private Arranger() {
@@ -40,14 +49,49 @@ public final class Arranger {
         MidiWriter.programChange(lead, LEAD, spec.instruments().lead());
         MidiWriter.programChange(comp, COMP, spec.instruments().comp());
         MidiWriter.programChange(bass, BASS, spec.instruments().bass());
+        // Room ambience: wetter lead and chords, a drier bass so the low end stays tight.
+        effects(lead, LEAD, leadReverb(spec.instruments().lead()), leadChorus(spec.instruments().lead()));
+        effects(comp, COMP, 56, 24);
+        effects(bass, BASS, 18, 0);
+        effects(drums, DRUMS, 40, 0);
 
+        int leadBoost = Instruments.isBrass(spec.instruments().lead()) ? BRASS_PUNCH : 0;
         for (MelodyNote n : song.melody()) {
             long sounding = Math.max(MidiWriter.PPQ / 8, Math.round(n.durationTicks() * LEGATO));
-            timing.note(lead, LEAD, n.pitch(), n.velocity(), n.startTick(), sounding);
+            timing.note(lead, LEAD, n.pitch(), n.velocity() + leadBoost, n.startTick(), sounding);
         }
-        CompPart.render(song, groove, comp, COMP, timing, rng);
+        List<MelodyNote> upperVoices = new ArrayList<>(song.melody());
+        if (spec.instruments().hasHarmony()) {
+            Track harmony = sequence.createTrack();
+            MidiWriter.programChange(harmony, HARMONY, spec.instruments().harmony());
+            effects(harmony, HARMONY, leadReverb(spec.instruments().harmony()),
+                    leadChorus(spec.instruments().harmony()));
+            List<MelodyNote> harmonyLine = Harmonizer.thirdsBelow(song.melody(), song.sections(), spec.key().scale(),
+                    spec.beatsPerBar());
+            upperVoices.addAll(harmonyLine);
+            for (MelodyNote n : harmonyLine) {
+                long sounding = Math.max(MidiWriter.PPQ / 8, Math.round(n.durationTicks() * LEGATO));
+                // No punch boost: the harmony must stay under the lead, or it takes over on held notes.
+                timing.note(harmony, HARMONY, n.pitch(), n.velocity(), n.startTick(), sounding);
+            }
+        }
+        CompPart.render(song, groove, comp, COMP, timing, rng, upperVoices);
         BassPart.render(song, groove, bass, BASS, timing, rng);
         DrumPart.render(song, groove, drums, timing, rng);
         return sequence;
+    }
+
+    /** Brass samples carry their own room sound and blur under heavy reverb, so they stay much drier. */
+    private static int leadReverb(int program) {
+        return Instruments.isBrass(program) ? 24 : 40;
+    }
+
+    private static int leadChorus(int program) {
+        return Instruments.isBrass(program) ? 0 : 8;
+    }
+
+    private static void effects(Track track, int channel, int reverb, int chorus) {
+        MidiWriter.controlChange(track, channel, REVERB, reverb);
+        MidiWriter.controlChange(track, channel, CHORUS, chorus);
     }
 }

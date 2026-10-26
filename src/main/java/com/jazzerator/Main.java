@@ -74,6 +74,12 @@ public final class Main {
         Compilation.write(entries, cli.soundfont(), wav, tracklist);
         System.out.println("Wrote " + wav.getAbsolutePath());
         System.out.println("Wrote " + tracklist.getAbsolutePath());
+        if (cli.video() != null) {
+            File mp4 = new File(base + ".mp4");
+            System.out.println("Encoding video...");
+            VideoMaker.make(entries, cli.video(), cli.fps(), wav, mp4, cli.ffmpeg());
+            System.out.println("Wrote " + mp4.getAbsolutePath());
+        }
     }
 
     private static void printGenres() {

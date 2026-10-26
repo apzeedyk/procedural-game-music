@@ -1,8 +1,10 @@
 package com.jazzerator.theory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
-/** A 7-note scale rooted on a pitch class, with helpers for moving through it in MIDI space. */
+/** A scale rooted on a pitch class (7 notes, or fewer/more when adapted to a chord), with MIDI-space helpers. */
 public final class Scale {
     private final int tonic;
     private final Mode mode;
@@ -12,6 +14,36 @@ public final class Scale {
         this.tonic = Note.pc(tonic);
         this.mode = mode;
         this.pitchClasses = Arrays.stream(mode.intervals()).map(i -> Note.pc(this.tonic + i)).toArray();
+    }
+
+    private Scale(int tonic, Mode mode, int[] pitchClasses) {
+        this.tonic = tonic;
+        this.mode = mode;
+        this.pitchClasses = pitchClasses;
+    }
+
+    /**
+     * This scale adapted to a chord that borrows notes from outside the key (secondary dominants, borrowed
+     * chords, tritone subs). Each outside chord tone is added, and any scale tone a half step from it that is not
+     * itself a chord tone is removed, so melodies never sound G against a G# chord. Diatonic chords return this
+     * scale unchanged.
+     */
+    public Scale forChord(Chord chord) {
+        List<Integer> pcs = new ArrayList<>(Arrays.stream(pitchClasses).boxed().toList());
+        boolean changed = false;
+        for (int tone : chord.pitchClasses()) {
+            if (pcs.contains(tone)) {
+                continue;
+            }
+            pcs.removeIf(p -> (Note.pc(p - tone) == 1 || Note.pc(tone - p) == 1) && !chord.containsPc(p));
+            pcs.add(tone);
+            changed = true;
+        }
+        if (!changed) {
+            return this;
+        }
+        pcs.sort((a, b) -> Integer.compare(Note.pc(a - tonic), Note.pc(b - tonic)));
+        return new Scale(tonic, mode, pcs.stream().mapToInt(Integer::intValue).toArray());
     }
 
     public int tonic() {

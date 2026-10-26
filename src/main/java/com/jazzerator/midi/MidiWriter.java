@@ -49,6 +49,10 @@ public final class MidiWriter {
         track.add(event(ShortMessage.PROGRAM_CHANGE, channel, program, 0, 0));
     }
 
+    public static void controlChange(Track track, int channel, int controller, int value) {
+        track.add(event(ShortMessage.CONTROL_CHANGE, channel, controller, value, 0));
+    }
+
     public static void note(Track track, int channel, int pitch, int velocity, long startTick, long durationTicks) {
         track.add(event(ShortMessage.NOTE_ON, channel, pitch, velocity, startTick));
         track.add(event(ShortMessage.NOTE_OFF, channel, pitch, 0, startTick + durationTicks));

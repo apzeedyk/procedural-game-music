@@ -6,7 +6,6 @@ import com.jazzerator.harmony.HarmonyStyle;
 import com.jazzerator.melody.OrnamentStyle;
 import com.jazzerator.theory.Mode;
 import com.jazzerator.util.Weighted;
-import java.util.List;
 
 /**
  * One common pairing of musical choices within a genre, e.g. "Phrygian fury" for boss battles. Every field is
@@ -26,7 +25,7 @@ public record Pairing(
         Weighted<Integer> sectionBars,
         Weighted<String> progressions,
         Weighted<Structure> structures,
-        List<Instruments> instruments,
+        Weighted<Instruments> instruments,
         HarmonyStyle harmony,
         OrnamentStyle ornaments,
         Groove groove) {

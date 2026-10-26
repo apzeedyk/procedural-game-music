@@ -29,7 +29,7 @@ public final class HarmonyDecorator {
         extensions(slots, key, style, rng);
         slots = secondaryDominants(slots, key, style, rng);
         tritoneSubs(slots, style, rng);
-        slots = suspensions(slots, style, rng);
+        slots = suspensions(slots, key, style, rng);
         inversions(slots, style, rng);
         return List.copyOf(slots);
     }
@@ -150,14 +150,21 @@ public final class HarmonyDecorator {
         }
     }
 
-    /** A triad becomes sus4 for its first half, resolving to the plain chord. */
-    private static List<ChordSlot> suspensions(List<ChordSlot> slots, HarmonyStyle style, Rng rng) {
+    /**
+     * A triad becomes suspended for its first half, resolving to the plain chord. The suspension must stay in the
+     * key: sus4 when its fourth is diatonic, otherwise sus2, otherwise none (IV in a major key has no diatonic
+     * sus4: C-F-G in G major would put F natural against F#).
+     */
+    private static List<ChordSlot> suspensions(List<ChordSlot> slots, Key key, HarmonyStyle style, Rng rng) {
+        Scale scale = key.scale();
         List<ChordSlot> out = new ArrayList<>();
         for (ChordSlot s : slots) {
             Chord c = s.chord();
-            if (isTriad(c) && !c.add9() && s.durationTicks() >= MIN_SPLIT_TICKS && rng.chance(style.suspension())) {
+            Quality sus = scale.contains(c.root() + 5) ? Quality.SUS4 : scale.contains(c.root() + 2) ? Quality.SUS2 : null;
+            if (sus != null && isTriad(c) && !c.add9() && s.durationTicks() >= MIN_SPLIT_TICKS
+                    && rng.chance(style.suspension())) {
                 long half = s.durationTicks() / 2;
-                out.add(new ChordSlot(c.withQuality(Quality.SUS4), s.startTick(), half));
+                out.add(new ChordSlot(c.withQuality(sus), s.startTick(), half));
                 out.add(new ChordSlot(c, s.startTick() + half, s.durationTicks() - half));
             } else {
                 out.add(s);

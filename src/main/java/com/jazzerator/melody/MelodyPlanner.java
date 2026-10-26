@@ -108,12 +108,13 @@ public final class MelodyPlanner {
             if (Math.abs(lastInterval) >= LEAP && Integer.signum(step) == Integer.signum(lastInterval)) {
                 step = -Integer.signum(step); // leap recovery: step back against a large leap
             }
-            int target = scale.step(pitch, step);
+            Scale local = scale.forChord(chord); // follow chromatic chord tones (G# over E7, not G)
+            int target = local.step(pitch, step);
             if (target > MAX_PITCH || target < MIN_PITCH) {
-                target = scale.step(pitch, -step); // bounce off the edge of the range
+                target = local.step(pitch, -step); // bounce off the edge of the range
             }
             if (Math.abs(target - pitch) == 6) {
-                target = scale.step(target, -Integer.signum(step)); // no tritone leaps
+                target = local.step(target, -Integer.signum(step)); // no tritone leaps
             }
             boolean strong = isStrongBeat(tick - section.startTick(), section.ticksPerBar(), beatsPerBar);
             boolean cadence = noteIndex == noteCount - 1 && ticks >= MidiWriter.PPQ * 2L;

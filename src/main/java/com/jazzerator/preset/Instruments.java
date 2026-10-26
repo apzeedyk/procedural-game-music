@@ -1,7 +1,21 @@
 package com.jazzerator.preset;
 
-/** General MIDI program numbers (0-based) for each part. */
-public record Instruments(int lead, int comp, int bass) {
+/**
+ * General MIDI program numbers (0-based) for each part.
+ *
+ * @param harmony instrument doubling the lead in parallel thirds below, or {@link #NONE}
+ */
+public record Instruments(int lead, int comp, int bass, int harmony) {
+    public static final int NONE = -1;
+
+    public Instruments(int lead, int comp, int bass) {
+        this(lead, comp, bass, NONE);
+    }
+
+    public boolean hasHarmony() {
+        return harmony != NONE;
+    }
+
     public static final int PIANO = 0;
     public static final int E_PIANO = 4;
     public static final int CELESTA = 8;
@@ -23,6 +37,7 @@ public record Instruments(int lead, int comp, int bass) {
     public static final int SLOW_STRINGS = 49;
     public static final int CHOIR = 52;
     public static final int TRUMPET = 56;
+    public static final int TROMBONE = 57;
     public static final int FRENCH_HORN = 60;
     public static final int BRASS = 61;
     public static final int OBOE = 68;
@@ -53,6 +68,20 @@ public record Instruments(int lead, int comp, int bass) {
         "Taiko Drum", "Melodic Tom", "Synth Drum", "Reverse Cymbal", "Guitar Fret Noise", "Breath Noise", "Seashore",
         "Bird Tweet", "Telephone Ring", "Helicopter", "Applause", "Gunshot"
     };
+
+    /**
+     * Instruments whose sound swells in slowly (bowed sections, choirs, pads). Short repeated notes on these never
+     * fully speak and sound like a pulsing drone, so they should sustain instead.
+     */
+    public static boolean isSlowAttack(int program) {
+        return program >= 48 && program <= 54   // string sections, synth strings, choirs, voices
+                || program >= 88 && program <= 95; // synth pads
+    }
+
+    /** Trumpets, trombones, horns, tuba, brass sections and synth brass. */
+    public static boolean isBrass(int program) {
+        return program >= 56 && program <= 63;
+    }
 
     /** General MIDI instrument name for a 0-based program number. */
     public static String name(int program) {

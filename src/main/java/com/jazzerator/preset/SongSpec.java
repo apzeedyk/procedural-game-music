@@ -42,7 +42,7 @@ public record SongSpec(
                 p.beatsPerBar().pick(rng),
                 p.sectionBars().pick(rng),
                 pickStructure(rng, p, forcedStructure),
-                rng.pick(p.instruments()));
+                p.instruments().pick(rng));
     }
 
     public int totalBars() {
@@ -62,8 +62,9 @@ public record SongSpec(
                 "Tempo:     " + tempo + " BPM, " + feel.displayName() + ", " + beatsPerBar + "/4",
                 "Structure: " + structure.displayName() + " (" + sectionBars + "-bar sections)",
                 "Length:    " + totalBars() + " bars, ~" + secs / 60 + ":" + String.format("%02d", secs % 60),
-                "Instr:     " + Instruments.name(instruments.lead()) + " / " + Instruments.name(instruments.comp())
-                        + " / " + Instruments.name(instruments.bass()),
+                "Instr:     " + Instruments.name(instruments.lead())
+                        + (instruments.hasHarmony() ? " + " + Instruments.name(instruments.harmony()) + " (3rds)" : "")
+                        + " / " + Instruments.name(instruments.comp()) + " / " + Instruments.name(instruments.bass()),
                 "Groove:    " + pairing.groove().displayName());
     }
 

@@ -25,7 +25,7 @@ public final class SongGenerator {
         Rng rng = new Rng(seed);
         SongSpec spec = SongSpec.random(rng, forcedGenre, forcedStructure);
         List<Section> sections = HarmonyPlanner.plan(spec, rng);
-        List<MelodyNote> melody = Ornamenter.ornament(MelodyPlanner.plan(spec, sections, rng), spec, rng);
+        List<MelodyNote> melody = Ornamenter.ornament(MelodyPlanner.plan(spec, sections, rng), spec, sections, rng);
         return new Song(spec, sections, melody);
     }
 }
