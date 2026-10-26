@@ -3,6 +3,7 @@ package com.jazzerator;
 import com.jazzerator.arrange.Arranger;
 import com.jazzerator.form.Song;
 import com.jazzerator.form.Structure;
+import com.jazzerator.midi.AudioRenderer;
 import com.jazzerator.midi.WavRenderer;
 import com.jazzerator.preset.GenrePreset;
 import java.io.File;
@@ -35,11 +36,21 @@ public final class Compilation {
 
     /** Songs with consecutive seeds until the running length reaches the target. */
     public static List<Entry> plan(long firstSeed, GenrePreset genre, Structure structure, double minutes) {
+        try {
+            return plan(firstSeed, genre, structure, minutes, AudioRenderer.soundFont(null));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** As {@link #plan(long, GenrePreset, Structure, double)}, with each song's mix balanced for the renderer. */
+    public static List<Entry> plan(long firstSeed, GenrePreset genre, Structure structure, double minutes,
+                                   AudioRenderer renderer) throws IOException {
         List<Entry> entries = new ArrayList<>();
         double t = 0;
         for (long seed = firstSeed; t < minutes * 60; seed++) {
             Song song = SongGenerator.generate(seed, genre, structure);
-            Sequence sequence = Arranger.render(song);
+            Sequence sequence = Arranger.renderMixed(song, renderer);
             double seconds = WavRenderer.seconds(sequence, song.spec().tempo(), GAP_SECONDS);
             entries.add(new Entry(song, sequence, t, seconds));
             t += seconds;
@@ -47,7 +58,8 @@ public final class Compilation {
         return entries;
     }
 
-    public static void write(List<Entry> entries, File soundfont, File wav, File tracklist) throws IOException {
+    public static void write(List<Entry> entries, AudioRenderer renderer, File wav, File tracklist)
+            throws IOException {
         Files.writeString(tracklist.toPath(), tracklist(entries));
 
         long totalFrames = 0;
@@ -67,7 +79,7 @@ public final class Compilation {
                 System.out.printf("  rendering %d:%02d  %s%n", (int) e.startSeconds() / 60,
                         (int) e.startSeconds() % 60, title(e.song()));
                 try {
-                    return WavRenderer.render(e.sequence(), e.song().spec().tempo(), soundfont, GAP_SECONDS);
+                    return renderer.render(e.sequence(), e.song().spec().tempo(), GAP_SECONDS);
                 } catch (IOException ex) {
                     throw new UncheckedIOException(ex);
                 }

@@ -38,7 +38,7 @@ public final class Ornamenter {
      * @param sections the song's harmony, so ornaments follow chromatic chord tones; null uses the plain key scale
      */
     public static List<MelodyNote> ornament(List<MelodyNote> plain, OrnamentStyle style, Key key, int tempo,
-                                            int beatsPerBar, Feel feel, Rng rng, List<Section> sections) {
+                                            int beatsPerBar, Feel feel, Rng random, List<Section> sections) {
         Scale keyScale = key.scale();
         LongFunction<Scale> scaleAt = tick -> sections == null ? keyScale : keyScale.forChord(chordAt(sections, tick));
         long ticksPerBar = PPQ * beatsPerBar;
@@ -51,6 +51,7 @@ public final class Ornamenter {
         for (int i = 0; i < plain.size(); i++) {
             MelodyNote n = plain.get(i);
             MelodyNote next = i + 1 < plain.size() ? plain.get(i + 1) : null;
+            Rng rng = random.fork("ornament", n.startTick()); // keyed by position, not by note count
 
             if (rng.chance(style.grace())) {
                 addGrace(out, n, scaleAt.apply(n.startTick()), rng.chance(0.5));

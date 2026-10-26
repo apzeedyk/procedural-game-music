@@ -4,13 +4,16 @@ import com.jazzerator.arrange.Arranger;
 import com.jazzerator.form.Song;
 import com.jazzerator.midi.MidiPlayer;
 import com.jazzerator.midi.MidiWriter;
-import com.jazzerator.midi.WavRenderer;
+import com.jazzerator.midi.AudioPlayer;
 import com.jazzerator.preset.GenrePreset;
 import com.jazzerator.preset.Pairing;
 import com.jazzerator.preset.Presets;
 import java.io.File;
 import java.util.List;
 import javax.sound.midi.Sequence;
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
 
 public final class Main {
     public static void main(String[] args) throws Exception {
@@ -43,18 +46,26 @@ public final class Main {
             System.out.println(song.spec().summary());
             System.out.println(song.chart());
 
-            Sequence sequence = Arranger.render(song);
+            Sequence sequence = Arranger.renderMixed(song, cli.renderer());
             File file = new File(cli.outputFor(n, seed, song.spec().genre().id()));
             MidiWriter.save(sequence, file);
             System.out.println("Wrote " + file.getAbsolutePath());
             if (cli.wav()) {
                 File wav = new File(file.getPath().replaceFirst("\\.mid$", "") + ".wav");
-                WavRenderer.write(sequence, song.spec().tempo(), cli.soundfont(), wav);
+                try (AudioInputStream audio = cli.renderer().render(sequence, song.spec().tempo(), 0)) {
+                    AudioSystem.write(audio, AudioFileFormat.Type.WAVE, wav);
+                }
                 System.out.println("Wrote " + wav.getAbsolutePath());
             }
             System.out.println();
             if (cli.play()) {
-                MidiPlayer.play(sequence, cli.soundfont());
+                if (cli.chip()) {
+                    try (AudioInputStream audio = cli.renderer().render(sequence, song.spec().tempo(), 0)) {
+                        AudioPlayer.play(audio);
+                    }
+                } else {
+                    MidiPlayer.play(sequence, cli.soundfont());
+                }
             }
         }
     }
@@ -66,12 +77,12 @@ public final class Main {
         File wav = new File(base + ".wav");
         File tracklist = new File(base + "-tracklist.txt");
         List<Compilation.Entry> entries =
-                Compilation.plan(cli.seed(), cli.genre(), cli.structure(), cli.compilationMinutes());
+                Compilation.plan(cli.seed(), cli.genre(), cli.structure(), cli.compilationMinutes(), cli.renderer());
         Compilation.Entry last = entries.get(entries.size() - 1);
         int total = (int) Math.round(last.startSeconds() + last.seconds());
         System.out.printf("Compilation: %d songs, %d:%02d:%02d%n", entries.size(), total / 3600, total % 3600 / 60,
                 total % 60);
-        Compilation.write(entries, cli.soundfont(), wav, tracklist);
+        Compilation.write(entries, cli.renderer(), wav, tracklist);
         System.out.println("Wrote " + wav.getAbsolutePath());
         System.out.println("Wrote " + tracklist.getAbsolutePath());
         if (cli.video() != null) {

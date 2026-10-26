@@ -70,6 +70,18 @@ class HarmonyDecoratorTest {
     }
 
     @Test
+    void noSecondaryDominantThatFlipsTheKeysQuality() {
+        // A Mixolydian: G's V7 is D7, whose C natural would turn the home A major chord minor.
+        Key a = Key.of("A", Mode.MIXOLYDIAN);
+        List<ChordSlot> out = HarmonyDecorator.decorate(bars(a, "I", "bVII"), a, only("secdom"), new Rng(1));
+        assertEquals(2, out.size());
+        assertEquals(a.chord("I"), out.get(0).chord());
+        // Still allowed when the V7 fits: E7 -> Am in C major (G# is not C's other third).
+        List<ChordSlot> c = HarmonyDecorator.decorate(bars(C, "I", "vi"), C, only("secdom"), new Rng(1));
+        assertEquals(3, c.size());
+    }
+
+    @Test
     void tritoneSubstitution() {
         List<ChordSlot> out = HarmonyDecorator.decorate(bars(C, "ii7", "V7", "I"), C, only("tritone"), new Rng(1));
         assertEquals(new Chord(Note.parse("Db"), Quality.DOM7), out.get(1).chord());
@@ -98,9 +110,20 @@ class HarmonyDecoratorTest {
 
     @Test
     void borrowedChordsFromParallelMinor() {
-        List<ChordSlot> out = HarmonyDecorator.decorate(bars(C, "IV", "vi"), C, only("borrowed"), new Rng(1));
-        assertEquals(C.chord("iv"), out.get(0).chord());
-        assertEquals(C.chord("bVI"), out.get(1).chord());
+        // IV -> iv before I, and vi -> bVI before V: borrowed colors that lead home.
+        List<ChordSlot> out = HarmonyDecorator.decorate(bars(C, "I", "IV", "I", "vi", "V"), C, only("borrowed"),
+                new Rng(1));
+        assertEquals(C.chord("iv"), out.get(1).chord());
+        assertEquals(C.chord("bVI"), out.get(3).chord());
+    }
+
+    @Test
+    void borrowedChordsOnlyWhereTheyLeadHome() {
+        // A section's first chord stays as written; so does a IV that doesn't lead to I or V.
+        List<ChordSlot> out = HarmonyDecorator.decorate(bars(C, "IV", "V", "IV", "vi"), C, only("borrowed"),
+                new Rng(1));
+        assertEquals(C.chord("IV"), out.get(0).chord());
+        assertEquals(C.chord("IV"), out.get(2).chord());
     }
 
     @Test

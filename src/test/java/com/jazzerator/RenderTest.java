@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.jazzerator.arrange.Arranger;
 import com.jazzerator.form.Song;
+import com.jazzerator.midi.AudioRenderer;
 import com.jazzerator.midi.WavRenderer;
 import com.jazzerator.preset.Presets;
 import java.io.File;
@@ -68,7 +69,7 @@ class RenderTest {
         List<Compilation.Entry> entries = Compilation.plan(1, Presets.byId("chiptune").orElseThrow(), null, 0.5);
         File wav = dir.resolve("mix.wav").toFile();
         File txt = dir.resolve("mix.txt").toFile();
-        Compilation.write(entries, null, wav, txt);
+        Compilation.write(entries, AudioRenderer.soundFont(null), wav, txt);
         Compilation.Entry last = entries.get(entries.size() - 1);
         try (AudioInputStream in = AudioSystem.getAudioInputStream(wav)) {
             assertEquals(last.startSeconds() + last.seconds(), in.getFrameLength() / in.getFormat().getFrameRate(),

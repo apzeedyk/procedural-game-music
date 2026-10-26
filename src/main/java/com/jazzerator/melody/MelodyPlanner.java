@@ -37,7 +37,7 @@ public final class MelodyPlanner {
             }
             int motifBars = section.bars() >= 8 ? 2 : 1;
             List<Motif> phrases = phrasePlans.computeIfAbsent(section.label(),
-                    l -> phrasePlan(spec, section.bars() / motifBars, motifBars, rng));
+                    l -> phrasePlan(spec, section.bars() / motifBars, motifBars, rng.fork("phrases", l)));
             int pitch = center(section.label());
             long tick = section.startTick();
             for (Motif phrase : phrases) {
@@ -50,14 +50,14 @@ public final class MelodyPlanner {
 
     /** Motif first, alternating repeats and variations, ending with a cadence. */
     private static List<Motif> phrasePlan(SongSpec spec, int phraseCount, int motifBars, Rng rng) {
-        Motif motif = MotifGenerator.generate(spec.feel(), spec.beatsPerBar(), motifBars, rng);
+        Motif motif = MotifGenerator.generate(spec.feel(), spec.beatsPerBar(), motifBars, rng.fork("motif"));
         List<Motif> plan = new ArrayList<>();
         for (int i = 0; i < phraseCount; i++) {
             Motif phrase;
             if (i == 0 || i % 2 == 1) {
                 phrase = motif;
             } else {
-                phrase = vary(motif, rng);
+                phrase = vary(motif, rng.fork("vary", i));
             }
             if (i == phraseCount - 1) {
                 phrase = phrase.withCadence(Math.min(CADENCE_BEATS, spec.beatsPerBar()));
@@ -117,10 +117,14 @@ public final class MelodyPlanner {
                 target = local.step(target, -Integer.signum(step)); // no tritone leaps
             }
             boolean strong = isStrongBeat(tick - section.startTick(), section.ticksPerBar(), beatsPerBar);
+            // Notes on any beat, or a beat or longer, carry the harmony and must be chord tones; shorter off-beat
+            // notes stay free to pass or neighbor between them.
+            boolean structural = Math.floorMod(tick - section.startTick(), MidiWriter.PPQ) == 0
+                    || ticks >= MidiWriter.PPQ;
             boolean cadence = noteIndex == noteCount - 1 && ticks >= MidiWriter.PPQ * 2L;
             if (cadence) {
                 target = nearestWithPc(target, chord.root());
-            } else if (strong) {
+            } else if (strong || structural) {
                 target = nearestChordTone(target, chord);
             }
             target = clamp(target);
@@ -131,6 +135,36 @@ public final class MelodyPlanner {
             noteIndex++;
         }
         return pitch;
+    }
+
+    /**
+     * Held notes follow the harmony: a note still sounding when the chord changes to one that alters it (G# held
+     * into an A7 with G natural) is split at the change and continues on the nearest note that fits the new chord,
+     * the way a singer or horn player would move with the harmony. Uses no randomness.
+     */
+    public static List<MelodyNote> followHarmony(List<MelodyNote> melody, List<Section> sections, Scale scale) {
+        List<MelodyNote> out = new ArrayList<>();
+        for (MelodyNote n : melody) {
+            MelodyNote current = n;
+            for (Section section : sections) {
+                for (ChordSlot slot : section.chords()) {
+                    long change = slot.startTick();
+                    if (change <= current.startTick() || change >= current.endTick()) {
+                        continue;
+                    }
+                    Scale fits = scale.forChord(slot.chord());
+                    if (fits.contains(current.pitch())) {
+                        continue;
+                    }
+                    out.add(new MelodyNote(current.pitch(), current.startTick(), change - current.startTick(),
+                            current.velocity()));
+                    current = new MelodyNote(fits.snap(current.pitch()), change, current.endTick() - change,
+                            Math.max(1, current.velocity() - 6));
+                }
+            }
+            out.add(current);
+        }
+        return List.copyOf(out);
     }
 
     static boolean isStrongBeat(long tickInSection, long ticksPerBar, int beatsPerBar) {

@@ -7,8 +7,14 @@ import com.jazzerator.midi.MidiWriter;
 import com.jazzerator.preset.Instruments;
 import com.jazzerator.preset.SongSpec;
 import com.jazzerator.util.Rng;
+import com.jazzerator.midi.AudioRenderer;
+import com.jazzerator.midi.ChipRenderer;
+import com.jazzerator.midi.MixBalancer;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import javax.sound.midi.Sequence;
 import javax.sound.midi.Track;
 
@@ -28,6 +34,42 @@ public final class Arranger {
     private static final long PERFORMANCE_SALT = 0x5EED_CAFEL;
 
     private Arranger() {
+    }
+
+    /**
+     * Mix levels relative to the lead, in dB: accompaniment sits well under the tune, harmony just under it,
+     * and the rhythm section supports without competing.
+     */
+    public static Map<Integer, Double> mixTargets() {
+        Map<Integer, Double> targets = new LinkedHashMap<>();
+        targets.put(HARMONY, -5.0);
+        targets.put(COMP, -7.0);
+        targets.put(BASS, -3.0);
+        targets.put(DRUMS, -3.0);
+        return targets;
+    }
+
+    /**
+     * Mix levels for a given sound source. Chip music balances its few voices nearly evenly, the way NES channels
+     * share the spotlight: a thin pulse wave 7 dB under a square lead sits in the same range and disappears.
+     */
+    public static Map<Integer, Double> mixTargets(AudioRenderer renderer) {
+        if (!(renderer instanceof ChipRenderer)) {
+            return mixTargets();
+        }
+        Map<Integer, Double> targets = new LinkedHashMap<>();
+        targets.put(HARMONY, -3.0);
+        targets.put(COMP, -3.0);
+        targets.put(BASS, -1.0);
+        targets.put(DRUMS, -2.0);
+        return targets;
+    }
+
+    /** Renders and auto-balances the mix for the synthesizer and SoundFont it will be heard through. */
+    public static Sequence renderMixed(Song song, AudioRenderer renderer) throws IOException {
+        Sequence sequence = render(song);
+        MixBalancer.balance(sequence, song.spec().tempo(), renderer, LEAD, mixTargets(renderer));
+        return sequence;
     }
 
     public static Sequence render(Song song) {

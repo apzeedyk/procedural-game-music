@@ -70,6 +70,36 @@ class MelodyPlannerTest {
         }
     }
 
+    /**
+     * The melody agrees with the chords: notes on a beat or lasting a beat or more are chord tones, and most of the
+     * melody's sounding time is on chord tones (non-chord tones are short, between beats).
+     */
+    @Test
+    void melodyAgreesWithTheChords() {
+        long total = 0;
+        long onChord = 0;
+        for (long seed = 0; seed < SEEDS; seed++) {
+            Rng rng = new Rng(seed);
+            SongSpec spec = SongSpec.random(rng, null);
+            List<Section> sections = HarmonyPlanner.plan(spec, rng);
+            List<MelodyNote> plain = MelodyPlanner.plan(spec, sections, rng);
+            for (MelodyNote n : plain) {
+                Section s = sections.stream().filter(x -> n.startTick() >= x.startTick() && n.startTick() < x.endTick())
+                        .findFirst().orElseThrow();
+                boolean onBeat = Math.floorMod(n.startTick() - s.startTick(), MidiWriter.PPQ) == 0;
+                if (onBeat || n.durationTicks() >= MidiWriter.PPQ) {
+                    assertTrue(MelodyPlanner.chordAt(s, n.startTick()).containsPc(n.pitch()),
+                            "seed " + seed + " structural non-chord tone at tick " + n.startTick());
+                }
+                total += n.durationTicks();
+                if (MelodyPlanner.chordAt(s, n.startTick()).containsPc(n.pitch())) {
+                    onChord += n.durationTicks();
+                }
+            }
+        }
+        assertTrue(onChord >= total * 0.75, "only " + (100 * onChord / total) + "% of melody time on chord tones");
+    }
+
     @Test
     void introHasNoMelody() {
         for (long seed = 0; seed < SEEDS; seed++) {

@@ -86,7 +86,7 @@ public final class WavRenderer {
      * All channel messages from every track in time order. At equal ticks, program changes come first and
      * note-offs precede note-ons so a repeated pitch is not cut off.
      */
-    private static List<MidiEvent> sortedShortEvents(Sequence sequence) {
+    static List<MidiEvent> sortedShortEvents(Sequence sequence) {
         List<MidiEvent> events = new ArrayList<>();
         for (Track track : sequence.getTracks()) {
             for (int i = 0; i < track.size(); i++) {

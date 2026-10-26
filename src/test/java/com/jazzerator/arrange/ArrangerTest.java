@@ -138,42 +138,46 @@ class ArrangerTest {
     }
 
     /**
-     * The comp keeps a steady register across the main sections, so it doesn't vanish under the melody in one
-     * section and pop out in the next.
+     * The comp stays near its home register instead of wandering, so it doesn't disappear in one section and pop
+     * out in the next. Only chords the melody isn't constraining are checked: when the tune sits low, the comp is
+     * meant to move down out of its way.
      */
     @Test
-    void compRegisterIsSteadyAcrossSections() {
+    void compStaysNearItsHomeRegister() {
+        int checked = 0;
+        int nearHome = 0;
         for (long seed = 0; seed < 300; seed++) {
             Song song = SongGenerator.generate(seed, null);
-            Sequence seq = Arranger.render(song);
-            Timing timing = new Timing(song);
-            double low = Double.MAX_VALUE;
-            double high = -Double.MAX_VALUE;
-            for (Section s : song.sections()) {
-                boolean frame = s.label().equals("Intro") || s.label().equals("Outro"); // may settle lower at the end
-                long from = timing.map(s.startTick());
-                long to = timing.map(s.endTick());
-                long sum = 0;
-                int count = 0;
-                for (Track track : seq.getTracks()) {
-                    for (int i = 0; i < track.size(); i++) {
-                        MidiEvent e = track.get(i);
-                        if (e.getMessage() instanceof ShortMessage m && m.getCommand() == ShortMessage.NOTE_ON
-                                && m.getData2() > 0 && m.getChannel() == Arranger.COMP
-                                && e.getTick() >= from && e.getTick() < to) {
-                            assertTrue(m.getData1() <= 70, "seed " + seed + " comp note too high: " + m.getData1());
-                            sum += m.getData1();
-                            count++;
-                        }
-                    }
+            List<MelodyNote> upper = upperVoices(song);
+            List<int[]> voicings = CompPart.planVoicings(song, upper);
+            List<ChordSlot> slots = song.sections().stream().flatMap(x -> x.chords().stream()).toList();
+            for (int i = 0; i < slots.size(); i++) {
+                if (CompPart.ceiling(slots.get(i), upper) < UNCONSTRAINED_CEILING) {
+                    continue;
                 }
-                if (count > 0 && !frame) {
-                    low = Math.min(low, sum / (double) count);
-                    high = Math.max(high, sum / (double) count);
+                checked++;
+                double average = java.util.Arrays.stream(voicings.get(i)).average().orElse(0);
+                if (Math.abs(average - HOME) <= 4) {
+                    nearHome++;
                 }
             }
-            assertTrue(high - low <= 4.0, "seed " + seed + " comp register drifts " + (high - low) + " semitones");
         }
+        assertTrue(nearHome >= checked * 0.95, nearHome + " of " + checked + " unconstrained chords sit near home");
+    }
+
+    /** The comp's home register (average pitch Bb3). */
+    private static final double HOME = 58;
+
+    /** A ceiling this high leaves the comp's home register untouched. */
+    private static final int UNCONSTRAINED_CEILING = 66;
+
+    private static List<MelodyNote> upperVoices(Song song) {
+        List<MelodyNote> upper = new ArrayList<>(song.melody());
+        if (song.spec().instruments().hasHarmony()) {
+            upper.addAll(Harmonizer.thirdsBelow(song.melody(), song.sections(), song.spec().key().scale(),
+                    song.spec().beatsPerBar()));
+        }
+        return upper;
     }
 
     /** Chords are voiced underneath the melody voices, so accompaniment and tune never trade places. */
@@ -262,7 +266,7 @@ class ArrangerTest {
         assertTrue(resolutions > 20, "too few suspensions sampled: " + resolutions);
     }
 
-    /** Chords avoid low, muddy close intervals (the arranger's low interval limits) whenever a clean voicing fits. */
+    /** Chords avoid low, muddy close intervals (low interval limits, stricter for seconds) whenever a clean voicing fits. */
     @Test
     void voicingsRespectLowIntervalLimits() {
         int total = 0;
@@ -274,9 +278,12 @@ class ArrangerTest {
                 upper.addAll(Harmonizer.thirdsBelow(song.melody(), song.sections(), song.spec().key().scale(),
                         song.spec().beatsPerBar()));
             }
-            for (int[] v : CompPart.planVoicings(song, upper)) {
+            List<int[]> voicings = CompPart.planVoicings(song, upper);
+            List<ChordSlot> slots = song.sections().stream().flatMap(x -> x.chords().stream()).toList();
+            for (int i = 0; i < voicings.size(); i++) {
                 total++;
-                if (CompPart.mudViolations(v) > 0) {
+                // A sus chord's own second is the suspension, not mud.
+                if (CompPart.mudViolations(voicings.get(i), CompPart.suspendedTone(slots.get(i).chord())) > 0) {
                     muddy++;
                 }
             }
@@ -284,10 +291,35 @@ class ArrangerTest {
         assertTrue(muddy <= total * 0.03, muddy + " of " + total + " chords are muddy");
     }
 
+    /** The comp keeps one texture (number of notes) instead of flickering between thin and thick chords. */
+    @Test
+    void compTextureIsSteady() {
+        int pairs = 0;
+        int changes = 0;
+        for (long seed = 0; seed < 300; seed++) {
+            Song song = SongGenerator.generate(seed, null);
+            List<MelodyNote> upper = new ArrayList<>(song.melody());
+            if (song.spec().instruments().hasHarmony()) {
+                upper.addAll(Harmonizer.thirdsBelow(song.melody(), song.sections(), song.spec().key().scale(),
+                        song.spec().beatsPerBar()));
+            }
+            List<int[]> voicings = CompPart.planVoicings(song, upper);
+            for (int i = 1; i < voicings.size(); i++) {
+                pairs++;
+                if (voicings.get(i).length != voicings.get(i - 1).length) {
+                    changes++;
+                }
+            }
+        }
+        assertTrue(changes <= pairs * 0.10, changes + " of " + pairs + " chord changes alter the texture");
+    }
+
     @Test
     void drop2OpensACloseVoicing() {
         assertArrayEquals(new int[]{47, 52, 56, 62}, CompPart.drop2(new int[]{52, 56, 59, 62})); // B3 drops to B2
-        assertEquals(1, CompPart.mudViolations(new int[]{50, 52, 56, 59})); // D3-E3 is below Eb3
+        assertEquals(1, CompPart.mudViolations(new int[]{50, 52, 56, 59})); // D3-E3: a low whole step
+        assertEquals(1, CompPart.mudViolations(new int[]{50, 57, 59}));     // A3-B3 in Gadd9: still too low
+        assertEquals(0, CompPart.mudViolations(new int[]{59, 61, 64}));     // a whole step from B3 is clear
         assertEquals(0, CompPart.mudViolations(new int[]{50, 56, 59}));     // rootless E7: clean
     }
 
@@ -318,6 +350,15 @@ class ArrangerTest {
         }
         Timing straightTiming = new Timing(straight);
         assertEquals(PPQ / 2, straightTiming.map(PPQ / 2));
+    }
+
+    @Test
+    void rockCompingLocksToTheKick() {
+        List<CompPart.Hit> comp = CompPart.hits(Groove.CompStyle.PUSH, 4);
+        java.util.Set<Double> kicks = new java.util.HashSet<>();
+        DrumPart.pattern(Groove.ROCK, 4).stream().filter(h -> h.note() == DrumPart.KICK)
+                .forEach(h -> kicks.add(h.beat()));
+        comp.forEach(h -> assertTrue(kicks.contains(h.beat()), "comp hit at " + h.beat() + " has no kick under it"));
     }
 
     @Test

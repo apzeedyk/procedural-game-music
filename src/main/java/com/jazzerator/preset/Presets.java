@@ -51,6 +51,7 @@ public final class Presets {
                                     .and(new Instruments(TRUMPET, STRINGS, FINGER_BASS, FRENCH_HORN), 0.5)
                                     .and(new Instruments(FRENCH_HORN, STRINGS, ACOUSTIC_BASS, TROMBONE), 0.25))
                             .groove(Groove.MARCH)
+                            .harmony(HarmonyStyle.HEROIC)
                             .build(),
                     pairing("Pastoral fields", 2)
                             .modes(Weighted.of(LYDIAN, 2.0).and(IONIAN, 1.0))
@@ -79,6 +80,7 @@ public final class Presets {
                                     .and(new Instruments(BRASS, PIANO, FINGER_BASS, TROMBONE), 1.5)
                                     .and(new Instruments(TRUMPET, PIANO, FINGER_BASS, FRENCH_HORN), 0.5))
                             .groove(Groove.ROCK)
+                            .harmony(HarmonyStyle.MODAL)
                             .build())),
 
             new GenrePreset("dungeon", "Dungeon", 1.0, List.of(
@@ -164,7 +166,8 @@ public final class Presets {
                             .feels(Weighted.of(STRAIGHT, 2.0).and(SHUFFLE, 1.0))
                             .beats(Weighted.of(4, 1.0).and(3, 1.0))
                             .progressions(Weighted.of("I IV I V", 2.0).and("I vi IV V", 2.0)
-                                    .and("I IV ii V", 1.0))
+                                    .and("I IV ii V", 1.0)
+                                    .and("I bVII IV I", 1.0).and("I IV bVII I", 1.0))
                             .structures(Weighted.of(AABA, 1.0).and(ABAB, 1.0).and(ABBA, 1.0))
                             .instruments(new Instruments(ACCORDION, NYLON_GUITAR, ACOUSTIC_BASS),
                                     new Instruments(FLUTE, NYLON_GUITAR, ACOUSTIC_BASS))
@@ -256,7 +259,8 @@ public final class Presets {
                             .tempo(100, 124)
                             .feels(Weighted.of(STRAIGHT, 1.0).and(SHUFFLE, 1.0))
                             .progressions(Weighted.of("I vi ii V", 2.0).and("Imaj7 IVmaj7 Imaj7 IVmaj7", 1.0)
-                                    .and("I iii IV iv", 1.0))
+                                    .and("I iii IV iv", 1.0)
+                                    .and("Imaj7 II Imaj7 II", 1.0).and("I II vi V", 1.0))
                             .structures(Weighted.of(ABAB, 1.0).and(RONDO, 2.0))
                             .instruments(new Instruments(MARIMBA, PIZZICATO, ACOUSTIC_BASS),
                                     new Instruments(CELESTA, PIZZICATO, ACOUSTIC_BASS))
@@ -270,7 +274,8 @@ public final class Presets {
                             .feels(Weighted.of(STRAIGHT, 1.0))
                             .beats(Weighted.of(3, 1.0).and(4, 1.0))
                             .progressions(Weighted.of("i bVII bVI bVII", 2.0).and("i iv bVII bIII", 1.0)
-                                    .and("i bIII iv i", 1.0))
+                                    .and("i bIII iv i", 1.0)
+                                    .and("i IV i IV", 1.0).and("i7 IV7 i7 bVII", 1.0))
                             .structures(Weighted.of(ABAB, 1.0).and(RONDO, 1.0).and(ABBA, 1.0))
                             .instruments(new Instruments(CELESTA, HARP, ACOUSTIC_BASS),
                                     new Instruments(VIBRAPHONE, STRINGS, ACOUSTIC_BASS))

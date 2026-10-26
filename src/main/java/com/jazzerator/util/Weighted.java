@@ -35,6 +35,17 @@ public final class Weighted<T> {
         return new Weighted<>(copy);
     }
 
+    /** The items that pass the test, with their weights; null if none do. */
+    public Weighted<T> filter(java.util.function.Predicate<T> keep) {
+        Map<T, Double> kept = new LinkedHashMap<>();
+        weights.forEach((item, weight) -> {
+            if (keep.test(item)) {
+                kept.put(item, weight);
+            }
+        });
+        return kept.isEmpty() ? null : new Weighted<>(kept);
+    }
+
     public T pick(Rng rng) {
         return rng.weightedPick(weights);
     }

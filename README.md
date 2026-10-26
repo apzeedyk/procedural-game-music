@@ -65,6 +65,7 @@ java -jar target/jazzerator.jar --list
 | `--play` | Play through the synthesizer |
 | `--wav` | Also render each song to WAV |
 | `--soundfont <file.sf2>` | Use a SoundFont for playback and rendering |
+| `--synth chip` | Built-in 8-bit synthesizer (pulse, triangle and noise waves) instead of sampled instruments |
 | `--compilation <minutes>` | Render consecutive songs into one WAV plus a chapter tracklist |
 | `--video <frames-or-image>` | With `--compilation`: also make an MP4 over a looping background |
 | `--fps <n>` | Background animation frame rate (default 12) |

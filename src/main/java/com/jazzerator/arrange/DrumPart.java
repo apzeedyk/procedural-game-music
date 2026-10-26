@@ -53,7 +53,7 @@ final class DrumPart {
                     hit(track, timing, CRASH, 100, barStart, rng);
                 }
                 boolean sectionEnd = bar == s.bars() - 1;
-                boolean midFill = bar == s.bars() / 2 - 1 && s.bars() >= 8 && rng.chance(0.35);
+                boolean midFill = bar == s.bars() / 2 - 1 && s.bars() >= 8 && rng.fork("mid-fill", barStart).chance(0.35);
                 double fillBeats = groove.fill() == Groove.Fill.NONE ? 0
                         : sectionEnd ? (groove == Groove.DRIVING || groove == Groove.ROCK ? 2 : 1)
                         : midFill ? 1 : 0;
@@ -83,7 +83,7 @@ final class DrumPart {
     }
 
     private static void hit(Track track, Timing timing, int note, int velocity, long tick, Rng rng) {
-        timing.note(track, CHANNEL, note, velocity + rng.range(-6, 6), tick, HIT);
+        timing.note(track, CHANNEL, note, velocity + rng.fork("drum", note, tick).range(-6, 6), tick, HIT);
     }
 
     static List<Hit> pattern(Groove groove, int beatsPerBar) {
@@ -111,7 +111,7 @@ final class DrumPart {
                     p.add(new Hit(TAMBOURINE, b, 55));
                 }
             }
-            case ROCK -> {
+            case ROCK -> { // kick 1, 3, 3& (the comp's PUSH pattern locks to this)
                 p.add(new Hit(KICK, 0, 100));
                 if (waltz) {
                     p.add(new Hit(SNARE, 2, 95));

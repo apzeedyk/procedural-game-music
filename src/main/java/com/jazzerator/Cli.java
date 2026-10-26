@@ -23,7 +23,13 @@ record Cli(
         double compilationMinutes,
         File video,
         double fps,
-        String ffmpeg) {
+        String ffmpeg,
+        boolean chip) {
+
+    /** The sound source chosen on the command line. */
+    com.jazzerator.midi.AudioRenderer renderer() {
+        return chip ? new com.jazzerator.midi.ChipRenderer() : com.jazzerator.midi.AudioRenderer.soundFont(soundfont);
+    }
 
     static final String USAGE = """
             Usage: java -jar jazzerator.jar [options]
@@ -39,6 +45,8 @@ record Cli(
               --play              Play each song through the synthesizer
               --wav               Also render each song to a .wav file
               --soundfont <file>  Use a SoundFont (.sf2) for playback and rendering
+              --synth <name>      Sound source: soundfont (default, sampled instruments) or chip
+                                  (built-in 8-bit synthesizer: pulse, triangle and noise waves)
               --compilation <min> Render consecutive songs into one WAV of at least <min> minutes,
                                   plus a tracklist with YouTube chapter timestamps
               --video <path>      With --compilation: also make an MP4 over a looping background
@@ -72,6 +80,7 @@ record Cli(
         File video = null;
         double fps = 12;
         String ffmpeg = "ffmpeg";
+        boolean chip = false;
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             switch (arg) {
@@ -119,6 +128,14 @@ record Cli(
                     }
                 }
                 case "--ffmpeg" -> ffmpeg = value(args, ++i, arg);
+                case "--synth" -> {
+                    String synth = value(args, ++i, arg);
+                    switch (synth) {
+                        case "chip" -> chip = true;
+                        case "soundfont" -> chip = false;
+                        default -> throw new UsageException("Unknown synth '" + synth + "'. Options: soundfont, chip");
+                    }
+                }
                 case "--compilation" -> {
                     String v = value(args, ++i, arg);
                     try {
@@ -138,7 +155,7 @@ record Cli(
             throw new UsageException("--video needs --compilation <minutes>.");
         }
         return new Cli(seed, genre, structure, count, play, out, help, list, soundfont, wav, compilationMinutes,
-                video, fps, ffmpeg);
+                video, fps, ffmpeg, chip);
     }
 
     /** Output path for the n-th song (0-based) of a batch. */

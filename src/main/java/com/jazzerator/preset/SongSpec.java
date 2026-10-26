@@ -29,20 +29,22 @@ public record SongSpec(
      * structure replaces the picked one after all random draws, so every other choice for the seed is unchanged.
      */
     public static SongSpec random(Rng rng, GenrePreset forcedGenre, Structure forcedStructure) {
-        GenrePreset genre = forcedGenre != null ? forcedGenre : weightedGenre(rng);
-        Pairing p = weightedPairing(rng, genre.pairings());
-        Key key = new Key(Note.parse(p.tonics().pick(rng)), p.modes().pick(rng));
+        // Each choice has its own random stream, so changing one table never reshuffles the others.
+        GenrePreset genre = forcedGenre != null ? forcedGenre : weightedGenre(rng.fork("genre"));
+        Pairing p = weightedPairing(rng.fork("pairing", genre.id()), genre.pairings());
+        Key key = new Key(Note.parse(p.tonics().pick(rng.fork("tonic"))), p.modes().pick(rng.fork("mode")));
+        Structure structure = forcedStructure != null ? forcedStructure : p.structures().pick(rng.fork("structure"));
         return new SongSpec(
                 rng.seed(),
                 genre,
                 p,
                 key,
-                rng.range(p.tempoMin(), p.tempoMax()),
-                p.feels().pick(rng),
-                p.beatsPerBar().pick(rng),
-                p.sectionBars().pick(rng),
-                pickStructure(rng, p, forcedStructure),
-                p.instruments().pick(rng));
+                rng.fork("tempo").range(p.tempoMin(), p.tempoMax()),
+                p.feels().pick(rng.fork("feel")),
+                p.beatsPerBar().pick(rng.fork("meter")),
+                p.sectionBars().pick(rng.fork("section-bars")),
+                structure,
+                p.instruments().pick(rng.fork("instruments")));
     }
 
     public int totalBars() {
@@ -66,11 +68,6 @@ public record SongSpec(
                         + (instruments.hasHarmony() ? " + " + Instruments.name(instruments.harmony()) + " (3rds)" : "")
                         + " / " + Instruments.name(instruments.comp()) + " / " + Instruments.name(instruments.bass()),
                 "Groove:    " + pairing.groove().displayName());
-    }
-
-    private static Structure pickStructure(Rng rng, Pairing p, Structure forced) {
-        Structure picked = p.structures().pick(rng);
-        return forced != null ? forced : picked;
     }
 
     private static GenrePreset weightedGenre(Rng rng) {

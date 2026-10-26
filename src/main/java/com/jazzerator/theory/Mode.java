@@ -30,6 +30,21 @@ public enum Mode {
         return offsetFromIonian;
     }
 
+    /**
+     * Semitones above the tonic that would erase this mode's character if a chord used them: Mixolydian loses its
+     * flat 7th to a leading tone, Lydian its #4 to a plain 4th, Dorian its natural 6th and flat 7th to b6 or a
+     * leading tone, Phrygian its b2 to a plain 2nd. Major and minor keys have none (V7 is idiomatic there).
+     */
+    public int[] avoid() {
+        return switch (this) {
+            case MIXOLYDIAN -> new int[]{11};
+            case DORIAN -> new int[]{8, 11};
+            case LYDIAN -> new int[]{5};
+            case PHRYGIAN -> new int[]{2};
+            default -> new int[0];
+        };
+    }
+
     /** True if the mode has a minor third (used for picking i vs I in generic progressions). */
     public boolean isMinor() {
         return intervals[2] == 3;

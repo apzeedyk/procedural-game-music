@@ -61,7 +61,7 @@ final class BassPart {
                     case OCTAVE -> rootPitch(chord) + 12;
                 };
                 boolean downbeat = Math.floorMod(span[0] - section.startTick(), section.ticksPerBar()) == 0;
-                timing.note(track, channel, fit(pitch), VELOCITY + (downbeat ? 8 : 0) + rng.range(-5, 5), span[0],
+                timing.note(track, channel, fit(pitch), VELOCITY + (downbeat ? 8 : 0) + rng.fork("bass", span[0]).range(-3, 3), span[0],
                         Math.max(PPQ / 8, span[1] - PPQ / 16));
             }
         }
@@ -132,7 +132,7 @@ final class BassPart {
                     pitch -= 12;
                 }
             }
-            timing.note(track, channel, fit(pitch), VELOCITY + (b == 0 ? 6 : 0) + rng.range(-5, 5),
+            timing.note(track, channel, fit(pitch), VELOCITY + (b == 0 ? 6 : 0) + rng.fork("walk", slot.startTick() + b * PPQ).range(-3, 3),
                     slot.startTick() + b * PPQ, PPQ - PPQ / 10);
         }
         long remainder = slot.durationTicks() - beats * PPQ; // odd-length slots

@@ -22,10 +22,18 @@ final class CompPart {
     private static final double HOME = 58;
     /** Cost per semitone of drifting from home, relative to voice-leading movement cost. */
     private static final double HOME_PULL = 3.0;
+    /** How far (in semitones of average pitch) the comp may stray from home before dropping color tones. */
+    private static final double HOME_WINDOW = 3.0;
     private static final int VELOCITY = 58;
-    /** Lowest clean bottom note for each interval of 1-11 semitones (E3 for a minor 2nd ... F2 for a 7th). */
-    private static final int[] LOW_INTERVAL_LIMIT = {0, 52, 51, 48, 46, 45, 47, 34, 43, 41, 41, 41};
+    /**
+     * Lowest clean bottom note for each interval of 1-11 semitones. Thirds and wider follow the textbook low
+     * interval limits (C3 for a minor 3rd ... F2 for a 7th). Seconds are stricter than the textbook (C4 for a
+     * minor 2nd, B3 for a major 2nd): on piano, a close second below middle C clouds the chord.
+     */
+    private static final int[] LOW_INTERVAL_LIMIT = {0, 60, 59, 48, 46, 45, 47, 34, 43, 41, 41, 41};
     private static final double MUD_PENALTY = 12;
+    private static final double VOICE_COUNT_CHANGE = 6;
+    private static final double SPREAD_CHANGE = 0.5;
     /** Drop-2 voicings may reach below the close-voicing floor, but not into the bass's own register. */
     private static final int LOWEST_NOTE = 47; // B2
     private static final long INSERTED = 1;
@@ -64,9 +72,10 @@ final class CompPart {
                             // suspension resolving) is the release, not the push, so it plays under the groove.
                             int accent = span[2] == INSERTED ? INSERTED_ACCENT
                                     : Math.floorMod(span[0] - section.startTick(), PPQ) == 0 ? 6 : 0;
+                            // One random lean per hit, shared by every note, so the chord stays even inside.
+                            int hit = VELOCITY + accent + rng.fork("comp", span[0]).range(-3, 3);
                             for (int pitch : voicing) {
-                                timing.note(track, channel, pitch, VELOCITY + accent + rng.range(-4, 4), span[0],
-                                        span[1]);
+                                timing.note(track, channel, pitch, hit + topLift(pitch, voicing), span[0], span[1]);
                             }
                         }
                     }
@@ -169,9 +178,14 @@ final class CompPart {
                 }
             }
             case PUSH -> {
-                hits.add(new Hit(0, 1.5));
-                hits.add(new Hit(1.5, waltz ? 1.5 : 1));
-                if (!waltz) {
+                // Locked to the rock kick (1, 3, and-of-3): the push on "3 and" lands with the kick, so the
+                // syncopation grooves instead of floating with nothing under it.
+                if (waltz) {
+                    hits.add(new Hit(0, 2));
+                    hits.add(new Hit(2, 1));
+                } else {
+                    hits.add(new Hit(0, 2));
+                    hits.add(new Hit(2, 0.5));
                     hits.add(new Hit(2.5, 1.5));
                 }
             }
@@ -210,7 +224,12 @@ final class CompPart {
                 }
             }
         }
-        if (spans.isEmpty() || spans.get(0)[0] != slot.startTick()) {
+        if (!spans.isEmpty() && spans.get(0)[0] != slot.startTick() && spans.get(0)[0] - slot.startTick() <= PPQ / 2) {
+            // A groove hit within half a beat after the chord change moves onto the change, rather than the change
+            // adding its own attack right before it (which stutters: 2&, 3, 3&).
+            long[] first = spans.get(0);
+            spans.set(0, new long[]{slot.startTick(), first[0] + first[1] - slot.startTick(), first[2]});
+        } else if (spans.isEmpty() || spans.get(0)[0] != slot.startTick()) {
             long next = spans.isEmpty() ? slot.endTick() : spans.get(0)[0];
             spans.add(0, new long[]{slot.startTick(), Math.min(PPQ, next - slot.startTick()), INSERTED});
         }
@@ -223,18 +242,24 @@ final class CompPart {
         for (long t = slot.startTick(); t < slot.endTick(); t += unit, step++) {
             int pitch = voicing[order[step % order.length] % voicing.length];
             long length = Math.min(unit * 2, slot.endTick() - t); // let notes ring into the next
-            timing.note(track, channel, pitch, VELOCITY + (step == 0 ? 8 : 0) + rng.range(-4, 4), t,
+            timing.note(track, channel, pitch, VELOCITY + (step == 0 ? 8 : 0) + rng.fork("arp", t).range(-2, 2), t,
                     Math.min(length, slot.endTick() - t));
         }
     }
 
     /** Sustained chord, rolled from the bottom up like a lazy guitar or e-piano strum. */
     private static void strum(Track track, int channel, Timing timing, ChordSlot slot, int[] voicing, Rng rng) {
+        int hit = VELOCITY + rng.fork("strum", slot.startTick()).range(-3, 3);
         for (int k = 0; k < voicing.length; k++) {
             long offset = Math.min(k * 18L, slot.durationTicks() / 4);
-            timing.note(track, channel, voicing[k], VELOCITY + rng.range(-5, 3), slot.startTick() + offset,
+            timing.note(track, channel, voicing[k], hit + topLift(voicing[k], voicing), slot.startTick() + offset,
                     slot.durationTicks() - offset);
         }
+    }
+
+    /** Pianists voice the top of a chord slightly forward; everything else in the hit plays evenly. */
+    private static int topLift(int pitch, int[] voicing) {
+        return pitch == voicing[voicing.length - 1] ? 3 : 0;
     }
 
     /**
@@ -242,37 +267,48 @@ final class CompPart {
      * notes move least relative to the previous chord, with a pull toward a home register. Without the pull the
      * chords drift with the harmony, and the comp alternates between hiding under the melody and popping out.
      */
+    /**
+     * Preference order, the way a pianist keeps their hand in place: a clean voicing near the home register (full
+     * chord, then without the 9th, a color tone that's dropped when it can't be voiced clearly), then a clean
+     * voicing anywhere under the melody, and only then the least muddy voicing that fits.
+     */
     static int[] nearestVoicing(Chord chord, int[] previous, int maxTop) {
-        int[] best = bestFit(chord, previous, maxTop);
-        if (best == null && chord.add9()) {
-            best = bestFit(chord.withAdd9(false), previous, maxTop); // too wide to fit: drop the 9th
-        }
-        return best != null ? best : lowestVoicing(chord.withAdd9(false));
-    }
-
-    private static int[] bestFit(Chord chord, int[] previous, int maxTop) {
-        List<int[]> candidates = candidates(chord);
-        // Prefer voicings that respect the low interval limits; only if none fit, accept the least muddy.
-        for (boolean requireClean : new boolean[]{true, false}) {
-            int[] best = null;
-            double bestCost = Double.MAX_VALUE;
-            for (int[] v : candidates) {
-                if (v[v.length - 1] > maxTop || v[0] < LOWEST_NOTE || requireClean && mudViolations(v) > 0) {
-                    continue;
-                }
-                double average = java.util.Arrays.stream(v).average().orElse(HOME);
-                double cost = movement(v, previous) + movement(previous, v) + HOME_PULL * Math.abs(average - HOME)
-                        + MUD_PENALTY * mudViolations(v);
-                if (cost < bestCost) {
-                    best = v;
-                    bestCost = cost;
-                }
+        Chord plain = chord.withAdd9(false);
+        int[] best = null;
+        for (double window : new double[]{HOME_WINDOW, Double.MAX_VALUE}) {
+            best = bestFit(chord, previous, maxTop, true, window);
+            if (best == null && chord.add9()) {
+                best = bestFit(plain, previous, maxTop, true, window);
             }
             if (best != null) {
                 return best;
             }
         }
-        return null;
+        best = bestFit(chord, previous, maxTop, false, Double.MAX_VALUE);
+        if (best == null && chord.add9()) {
+            best = bestFit(plain, previous, maxTop, false, Double.MAX_VALUE);
+        }
+        return best != null ? best : lowestVoicing(plain);
+    }
+
+    private static int[] bestFit(Chord chord, int[] previous, int maxTop, boolean requireClean, double window) {
+        int[] best = null;
+        double bestCost = Double.MAX_VALUE;
+        for (int[] v : candidates(chord)) {
+            double average = java.util.Arrays.stream(v).average().orElse(HOME);
+            int mud = mudViolations(v, suspendedTone(chord));
+            if (v[v.length - 1] > maxTop || v[0] < LOWEST_NOTE || requireClean && mud > 0
+                    || Math.abs(average - HOME) > window) {
+                continue;
+            }
+            double cost = movement(v, previous) + movement(previous, v) + HOME_PULL * Math.abs(average - HOME)
+                    + MUD_PENALTY * mud + textureChange(v, previous);
+            if (cost < bestCost) {
+                best = v;
+                bestCost = cost;
+            }
+        }
+        return best;
     }
 
     /**
@@ -305,6 +341,21 @@ final class CompPart {
         return out;
     }
 
+    /**
+     * Cost of changing the comp's texture: its number of notes and its spread. Keeping both steady makes the
+     * accompaniment sound like one player with a consistent touch, instead of flickering between thin and thick
+     * chords. The very first chord (voice-led from a single home note) is free to set the texture.
+     */
+    static double textureChange(int[] v, int[] previous) {
+        if (previous.length < 2) {
+            return 0;
+        }
+        int spread = v[v.length - 1] - v[0];
+        int previousSpread = previous[previous.length - 1] - previous[0];
+        return VOICE_COUNT_CHANGE * Math.abs(v.length - previous.length)
+                + SPREAD_CHANGE * Math.abs(spread - previousSpread);
+    }
+
     /** Second-highest note dropped an octave. */
     static int[] drop2(int[] close) {
         int[] v = close.clone();
@@ -319,14 +370,33 @@ final class CompPart {
      * C3, a major 3rd at Bb2, and so on).
      */
     static int mudViolations(int[] voicing) {
+        return mudViolations(voicing, -1);
+    }
+
+    /**
+     * As {@link #mudViolations(int[])}, but a second that involves the suspended tone of a sus chord is exempt:
+     * that rub is the suspension itself, a deliberate tension that resolves on the next chord.
+     */
+    static int mudViolations(int[] voicing, int suspendedPc) {
         int count = 0;
         for (int k = 0; k + 1 < voicing.length; k++) {
             int interval = voicing[k + 1] - voicing[k];
-            if (interval >= 1 && interval <= 11 && voicing[k] < LOW_INTERVAL_LIMIT[interval]) {
+            boolean suspension = interval <= 2
+                    && (Note.pc(voicing[k]) == suspendedPc || Note.pc(voicing[k + 1]) == suspendedPc);
+            if (interval >= 1 && interval <= 11 && voicing[k] < LOW_INTERVAL_LIMIT[interval] && !suspension) {
                 count++;
             }
         }
         return count;
+    }
+
+    /** The suspended tone's pitch class for sus chords, or -1. */
+    static int suspendedTone(Chord chord) {
+        return switch (chord.quality()) {
+            case SUS4 -> Note.pc(chord.root() + 5);
+            case SUS2 -> Note.pc(chord.root() + 2);
+            default -> -1;
+        };
     }
 
     /** The voicing with the lowest top note, for when nothing fits under the ceiling. */

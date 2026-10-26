@@ -40,7 +40,7 @@ public final class HarmonyPlanner {
         long ticksPerBar = (long) MidiWriter.PPQ * spec.beatsPerBar();
         Key key = spec.key();
         Map<String, List<Chord>> progressions = assignProgressions(spec, rng);
-        Chord dominant = dominant(key, rng);
+        Chord dominant = dominant(key, rng.fork("cadence-dominant"));
         Map<String, List<ChordSlot>> templates = new HashMap<>();
         Map<String, Integer> occurrences = new HashMap<>();
 
@@ -57,7 +57,7 @@ public final class HarmonyPlanner {
             List<ChordSlot> template = templates.computeIfAbsent(templateKey, k -> {
                 List<ChordSlot> plain = plainTemplate(progressions.get(label), bars, ticksPerBar);
                 applyCadence(plain, cadence, key, dominant);
-                return HarmonyDecorator.decorate(plain, key, spec.pairing().harmony(), rng);
+                return HarmonyDecorator.decorate(plain, key, spec.pairing().harmony(), rng.fork("decorate", k));
             });
 
             List<ChordSlot> slots = new ArrayList<>();
@@ -77,17 +77,26 @@ public final class HarmonyPlanner {
 
     /** The cadential dominant that suits the mode, chosen once per song. */
     static Chord dominant(Key key, Rng rng) {
+        // Modal keys cadence with chords from their own mode: a V7 would bring in the leading tone (D# in
+        // E Mixolydian, F natural in C Lydian's G7) and make the song flip between two scales.
         Weighted<String> options = switch (key.mode()) {
-            case IONIAN, LYDIAN, HARMONIC_MINOR, LOCRIAN -> Weighted.of("V7", 1.0);
-            case MIXOLYDIAN -> Weighted.of("bVII", 2.0).and("V7", 1.0);
-            case AEOLIAN, DORIAN -> Weighted.of("V7", 2.0).and("bVII", 1.0);
+            case IONIAN, HARMONIC_MINOR, LOCRIAN -> Weighted.of("V7", 1.0);
+            case LYDIAN -> Weighted.of("V", 2.0).and("II", 1.0);
+            case MIXOLYDIAN -> Weighted.of("bVII", 2.0).and("v", 1.0);
+            case AEOLIAN -> Weighted.of("V7", 2.0).and("bVII", 1.0);
+            case DORIAN -> Weighted.of("bVII", 2.0).and("v7", 1.0);
             case PHRYGIAN -> Weighted.of("bII", 2.0).and("bvii", 1.0);
         };
         return key.chord(options.pick(rng));
     }
 
+    /** The chord before the cadence, taken from the mode itself (Dorian's IV is major; Lydian has no plain IV). */
     private static Chord predominant(Key key) {
-        return key.chord(key.mode().isMinor() ? "iv" : "IV");
+        return key.chord(switch (key.mode()) {
+            case DORIAN, IONIAN, MIXOLYDIAN -> "IV";
+            case LYDIAN -> "vi";
+            default -> "iv";
+        });
     }
 
     /**
@@ -129,9 +138,10 @@ public final class HarmonyPlanner {
             if (chosen.containsKey(label) || isFrame(label)) {
                 continue;
             }
-            String prog = spec.pairing().progressions().pick(rng);
-            for (int t = 0; t < MAX_DISTINCT_TRIES && chosen.containsValue(prog); t++) {
-                prog = spec.pairing().progressions().pick(rng);
+            Weighted<String> options = progressionsFor(spec);
+            String prog = options.pick(rng.fork("progression", label, 0));
+            for (int t = 1; t <= MAX_DISTINCT_TRIES && chosen.containsValue(prog); t++) {
+                prog = options.pick(rng.fork("progression", label, t));
             }
             chosen.put(label, prog);
         }
@@ -144,6 +154,26 @@ public final class HarmonyPlanner {
         chosen.forEach((label, prog) ->
                 result.put(label, Arrays.stream(prog.split(" ")).map(spec.key()::chord).toList()));
         return result;
+    }
+
+    /**
+     * The pairing's progressions that fit the song's mode. Pairings can allow several modes (Aeolian or Dorian),
+     * and a progression written for one can break the other (bVI in Dorian brings in the b6 Dorian avoids).
+     */
+    static Weighted<String> progressionsFor(SongSpec spec) {
+        Key key = spec.key();
+        Weighted<String> fitting = spec.pairing().progressions().filter(prog ->
+                java.util.Arrays.stream(prog.split(" ")).map(key::chord).noneMatch(c -> usesAvoided(c, key)));
+        return fitting != null ? fitting : spec.pairing().progressions();
+    }
+
+    static boolean usesAvoided(Chord chord, Key key) {
+        for (int offset : key.mode().avoid()) {
+            if (chord.containsPc(key.tonic() + offset)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isFrame(String label) {
