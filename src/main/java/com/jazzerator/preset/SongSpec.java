@@ -47,6 +47,11 @@ public record SongSpec(
                 p.instruments().pick(rng.fork("instruments")));
     }
 
+    /** The same song performed on different instruments (instruments don't affect the composition). */
+    public SongSpec withInstruments(Instruments replacement) {
+        return new SongSpec(seed, genre, pairing, key, tempo, feel, beatsPerBar, sectionBars, structure, replacement);
+    }
+
     public int totalBars() {
         return structure.totalBars(sectionBars);
     }

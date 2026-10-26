@@ -78,9 +78,43 @@ public record Instruments(int lead, int comp, int bass, int harmony) {
                 || program >= 88 && program <= 95; // synth pads
     }
 
+    /** Acoustic and electric pianos, harpsichord and clavinet: instruments played with two hands. */
+    public static boolean isKeyboard(int program) {
+        return program >= 0 && program <= 7;
+    }
+
     /** Trumpets, trombones, horns, tuba, brass sections and synth brass. */
     public static boolean isBrass(int program) {
         return program >= 56 && program <= 63;
+    }
+
+    /**
+     * A General MIDI program from a number ("81") or a name, matched case-insensitively and ignoring spaces, either
+     * exactly ("saw lead") or as a unique partial match ("trombone").
+     */
+    public static java.util.OptionalInt byName(String text) {
+        String wanted = text.toLowerCase(java.util.Locale.ROOT).replace(" ", "");
+        try {
+            int program = Integer.parseInt(wanted);
+            return program >= 0 && program < GM_NAMES.length ? java.util.OptionalInt.of(program)
+                    : java.util.OptionalInt.empty();
+        } catch (NumberFormatException ignored) {
+            // a name, not a number
+        }
+        int partial = -1;
+        for (int p = 0; p < GM_NAMES.length; p++) {
+            String name = GM_NAMES[p].toLowerCase(java.util.Locale.ROOT).replace(" ", "");
+            if (name.equals(wanted)) {
+                return java.util.OptionalInt.of(p);
+            }
+            if (name.contains(wanted)) {
+                if (partial >= 0) {
+                    return java.util.OptionalInt.empty(); // ambiguous
+                }
+                partial = p;
+            }
+        }
+        return partial >= 0 ? java.util.OptionalInt.of(partial) : java.util.OptionalInt.empty();
     }
 
     /** General MIDI instrument name for a 0-based program number. */

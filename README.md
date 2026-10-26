@@ -65,7 +65,9 @@ java -jar target/jazzerator.jar --list
 | `--play` | Play through the synthesizer |
 | `--wav` | Also render each song to WAV |
 | `--soundfont <file.sf2>` | Use a SoundFont for playback and rendering |
-| `--synth chip` | Built-in 8-bit synthesizer (pulse, triangle and noise waves) instead of sampled instruments |
+| `--synth <name>` | `soundfont` (default, JDK synthesizer), `fluidsynth` (higher-fidelity SoundFont playback; needs `--soundfont`), or `chip` (built-in 8-bit synthesizer) |
+| `--fluidsynth <path>` | FluidSynth executable (default: `fluidsynth` on the PATH) |
+| `--lead`, `--harmony`, `--comp`, `--bass <instrument>` | Override instruments by General MIDI name or number, e.g. `--lead "saw lead"`; the composition is unchanged |
 | `--compilation <minutes>` | Render consecutive songs into one WAV plus a chapter tracklist |
 | `--video <frames-or-image>` | With `--compilation`: also make an MP4 over a looping background |
 | `--fps <n>` | Background animation frame rate (default 12) |
@@ -86,6 +88,16 @@ Groove:    Driving
 ## SoundFonts
 
 The JDK's built-in synthesizer works, but a good General MIDI SoundFont sounds much better. Free options include [GeneralUser GS](https://schristiancollins.com/generaluser.php) and FluidR3_GM. SoundFonts have their own licenses and are not part of this project. Put one in `soundfonts/` (git-ignored) and pass `--soundfont soundfonts/GeneralUser-GS.sf2`.
+
+### FluidSynth
+
+[FluidSynth](https://www.fluidsynth.org/) renders SoundFonts more faithfully than the JDK synthesizer (filters, envelopes, reverb). Download a release, then:
+
+```sh
+java -jar target/jazzerator.jar --synth fluidsynth --fluidsynth path/to/fluidsynth.exe     --soundfont soundfonts/MuseScore_General.sf2 --wav
+```
+
+All audio output is mixed automatically (each part balanced against the melody) and loudness-normalized, so songs and compilations play at a consistent level.
 
 ## Videos
 

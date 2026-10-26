@@ -24,11 +24,36 @@ record Cli(
         File video,
         double fps,
         String ffmpeg,
-        boolean chip) {
+        boolean chip,
+        boolean fluidsynth,
+        String fluidsynthPath,
+        Integer leadOverride,
+        Integer harmonyOverride,
+        Integer compOverride,
+        Integer bassOverride) {
+
+    /** Applies any --lead/--harmony/--comp/--bass overrides to a generated song. */
+    com.jazzerator.form.Song withOverrides(com.jazzerator.form.Song song) {
+        if (leadOverride == null && harmonyOverride == null && compOverride == null && bassOverride == null) {
+            return song;
+        }
+        com.jazzerator.preset.Instruments i = song.spec().instruments();
+        return song.withInstruments(new com.jazzerator.preset.Instruments(
+                leadOverride != null ? leadOverride : i.lead(),
+                compOverride != null ? compOverride : i.comp(),
+                bassOverride != null ? bassOverride : i.bass(),
+                harmonyOverride != null ? harmonyOverride : i.harmony()));
+    }
 
     /** The sound source chosen on the command line. */
     com.jazzerator.midi.AudioRenderer renderer() {
-        return chip ? new com.jazzerator.midi.ChipRenderer() : com.jazzerator.midi.AudioRenderer.soundFont(soundfont);
+        if (chip) {
+            return new com.jazzerator.midi.ChipRenderer();
+        }
+        if (fluidsynth) {
+            return new com.jazzerator.midi.FluidSynthRenderer(fluidsynthPath, soundfont);
+        }
+        return com.jazzerator.midi.AudioRenderer.soundFont(soundfont);
     }
 
     static final String USAGE = """
@@ -45,8 +70,13 @@ record Cli(
               --play              Play each song through the synthesizer
               --wav               Also render each song to a .wav file
               --soundfont <file>  Use a SoundFont (.sf2) for playback and rendering
-              --synth <name>      Sound source: soundfont (default, sampled instruments) or chip
-                                  (built-in 8-bit synthesizer: pulse, triangle and noise waves)
+              --synth <name>      Sound source: soundfont (default, JDK synthesizer), fluidsynth (FluidSynth,
+                                  needs --soundfont), or chip (built-in 8-bit synthesizer)
+              --fluidsynth <path> FluidSynth executable (default: fluidsynth on the PATH)
+              --lead <instrument> Override an instrument with a General MIDI name or number, e.g.
+              --harmony <...>     --lead "saw lead" or --comp 0. --harmony also adds a harmony line if the
+              --comp <...>        song had none ("none" removes it). The composition is unchanged.
+              --bass <...>
               --compilation <min> Render consecutive songs into one WAV of at least <min> minutes,
                                   plus a tracklist with YouTube chapter timestamps
               --video <path>      With --compilation: also make an MP4 over a looping background
@@ -81,6 +111,12 @@ record Cli(
         double fps = 12;
         String ffmpeg = "ffmpeg";
         boolean chip = false;
+        boolean fluidsynth = false;
+        String fluidsynthPath = "fluidsynth";
+        Integer leadOverride = null;
+        Integer harmonyOverride = null;
+        Integer compOverride = null;
+        Integer bassOverride = null;
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             switch (arg) {
@@ -128,12 +164,26 @@ record Cli(
                     }
                 }
                 case "--ffmpeg" -> ffmpeg = value(args, ++i, arg);
+                case "--fluidsynth" -> fluidsynthPath = value(args, ++i, arg);
+                case "--lead" -> leadOverride = instrument(arg, value(args, ++i, arg));
+                case "--harmony" -> {
+                    String v = value(args, ++i, arg);
+                    harmonyOverride = v.equalsIgnoreCase("none") ? com.jazzerator.preset.Instruments.NONE
+                            : instrument(arg, v);
+                }
+                case "--comp" -> compOverride = instrument(arg, value(args, ++i, arg));
+                case "--bass" -> bassOverride = instrument(arg, value(args, ++i, arg));
                 case "--synth" -> {
                     String synth = value(args, ++i, arg);
                     switch (synth) {
                         case "chip" -> chip = true;
-                        case "soundfont" -> chip = false;
-                        default -> throw new UsageException("Unknown synth '" + synth + "'. Options: soundfont, chip");
+                        case "fluidsynth" -> fluidsynth = true;
+                        case "soundfont" -> {
+                            chip = false;
+                            fluidsynth = false;
+                        }
+                        default -> throw new UsageException(
+                                "Unknown synth '" + synth + "'. Options: soundfont, fluidsynth, chip");
                     }
                 }
                 case "--compilation" -> {
@@ -151,11 +201,15 @@ record Cli(
                 default -> throw new UsageException("Unknown option '" + arg + "'.");
             }
         }
+        if (fluidsynth && soundfont == null) {
+            throw new UsageException("--synth fluidsynth needs --soundfont <file.sf2>.");
+        }
         if (video != null && compilationMinutes <= 0) {
             throw new UsageException("--video needs --compilation <minutes>.");
         }
         return new Cli(seed, genre, structure, count, play, out, help, list, soundfont, wav, compilationMinutes,
-                video, fps, ffmpeg, chip);
+                video, fps, ffmpeg, chip, fluidsynth, fluidsynthPath, leadOverride, harmonyOverride, compOverride,
+                bassOverride);
     }
 
     /** Output path for the n-th song (0-based) of a batch. */
@@ -175,6 +229,11 @@ record Cli(
             throw new UsageException(flag + " needs a value.");
         }
         return args[i];
+    }
+
+    private static int instrument(String flag, String text) {
+        return com.jazzerator.preset.Instruments.byName(text).orElseThrow(() -> new UsageException(
+                flag + ": no single General MIDI instrument matches '" + text + "'."));
     }
 
     private static long parseLong(String flag, String value) {

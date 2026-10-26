@@ -6,6 +6,11 @@ import java.util.List;
 
 /** A fully planned song: the spec, its sections and harmony, and the lead melody. */
 public record Song(SongSpec spec, List<Section> sections, List<MelodyNote> melody) {
+    /** The same song with its instrument choices replaced. */
+    public Song withInstruments(com.jazzerator.preset.Instruments instruments) {
+        return new Song(spec.withInstruments(instruments), sections, melody);
+    }
+
     public long endTick() {
         return sections.isEmpty() ? 0 : sections.get(sections.size() - 1).endTick();
     }

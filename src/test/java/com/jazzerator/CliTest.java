@@ -73,4 +73,22 @@ class CliTest {
         assertEquals("Gunshot", Instruments.name(127));
         assertTrue(Presets.ALL.size() > 0);
     }
+
+    @Test
+    void instrumentOverridesByNameOrNumber() {
+        assertEquals(81, Instruments.byName("saw lead").getAsInt());
+        assertEquals(81, Instruments.byName("Saw Lead").getAsInt());
+        assertEquals(57, Instruments.byName("trombone").getAsInt());
+        assertEquals(0, Instruments.byName("0").getAsInt());
+        assertTrue(Instruments.byName("lead").isEmpty()); // ambiguous
+        assertThrows(Cli.UsageException.class, () -> Cli.parse("--lead", "kazoo"));
+
+        Cli cli = Cli.parse("--lead", "saw lead", "--harmony", "square lead");
+        var song = SongGenerator.generate(3, Presets.byId("overworld").orElseThrow());
+        var changed = cli.withOverrides(song);
+        assertEquals(81, changed.spec().instruments().lead());
+        assertEquals(80, changed.spec().instruments().harmony());
+        assertEquals(song.melody(), changed.melody());    // composition untouched
+        assertEquals(song.sections(), changed.sections());
+    }
 }

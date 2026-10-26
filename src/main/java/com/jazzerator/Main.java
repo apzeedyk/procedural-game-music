@@ -5,6 +5,7 @@ import com.jazzerator.form.Song;
 import com.jazzerator.midi.MidiPlayer;
 import com.jazzerator.midi.MidiWriter;
 import com.jazzerator.midi.AudioPlayer;
+import com.jazzerator.midi.NormalizingRenderer;
 import com.jazzerator.preset.GenrePreset;
 import com.jazzerator.preset.Pairing;
 import com.jazzerator.preset.Presets;
@@ -42,7 +43,7 @@ public final class Main {
 
         for (int n = 0; n < cli.count(); n++) {
             long seed = cli.seed() + n;
-            Song song = SongGenerator.generate(seed, cli.genre(), cli.structure());
+            Song song = cli.withOverrides(SongGenerator.generate(seed, cli.genre(), cli.structure()));
             System.out.println(song.spec().summary());
             System.out.println(song.chart());
 
@@ -52,15 +53,17 @@ public final class Main {
             System.out.println("Wrote " + file.getAbsolutePath());
             if (cli.wav()) {
                 File wav = new File(file.getPath().replaceFirst("\\.mid$", "") + ".wav");
-                try (AudioInputStream audio = cli.renderer().render(sequence, song.spec().tempo(), 0)) {
+                try (AudioInputStream audio = new NormalizingRenderer(cli.renderer())
+                        .render(sequence, song.spec().tempo(), 0)) {
                     AudioSystem.write(audio, AudioFileFormat.Type.WAVE, wav);
                 }
                 System.out.println("Wrote " + wav.getAbsolutePath());
             }
             System.out.println();
             if (cli.play()) {
-                if (cli.chip()) {
-                    try (AudioInputStream audio = cli.renderer().render(sequence, song.spec().tempo(), 0)) {
+                if (cli.chip() || cli.fluidsynth()) {
+                    try (AudioInputStream audio = new NormalizingRenderer(cli.renderer())
+                            .render(sequence, song.spec().tempo(), 0)) {
                         AudioPlayer.play(audio);
                     }
                 } else {
@@ -77,12 +80,14 @@ public final class Main {
         File wav = new File(base + ".wav");
         File tracklist = new File(base + "-tracklist.txt");
         List<Compilation.Entry> entries =
-                Compilation.plan(cli.seed(), cli.genre(), cli.structure(), cli.compilationMinutes(), cli.renderer());
+                Compilation.plan(cli.seed(), cli.genre(), cli.structure(), cli.compilationMinutes(), cli.renderer(),
+                        cli::withOverrides);
         Compilation.Entry last = entries.get(entries.size() - 1);
         int total = (int) Math.round(last.startSeconds() + last.seconds());
         System.out.printf("Compilation: %d songs, %d:%02d:%02d%n", entries.size(), total / 3600, total % 3600 / 60,
                 total % 60);
-        Compilation.write(entries, cli.renderer(), wav, tracklist);
+        // Every song mastered to the same loudness, so the compilation doesn't jump in level between tracks.
+        Compilation.write(entries, new NormalizingRenderer(cli.renderer()), wav, tracklist);
         System.out.println("Wrote " + wav.getAbsolutePath());
         System.out.println("Wrote " + tracklist.getAbsolutePath());
         if (cli.video() != null) {

@@ -46,10 +46,17 @@ public final class Compilation {
     /** As {@link #plan(long, GenrePreset, Structure, double)}, with each song's mix balanced for the renderer. */
     public static List<Entry> plan(long firstSeed, GenrePreset genre, Structure structure, double minutes,
                                    AudioRenderer renderer) throws IOException {
+        return plan(firstSeed, genre, structure, minutes, renderer, song -> song);
+    }
+
+    /** As above, with a per-song adjustment (e.g. instrument overrides) applied before arranging. */
+    public static List<Entry> plan(long firstSeed, GenrePreset genre, Structure structure, double minutes,
+                                   AudioRenderer renderer, java.util.function.UnaryOperator<Song> adjust)
+            throws IOException {
         List<Entry> entries = new ArrayList<>();
         double t = 0;
         for (long seed = firstSeed; t < minutes * 60; seed++) {
-            Song song = SongGenerator.generate(seed, genre, structure);
+            Song song = adjust.apply(SongGenerator.generate(seed, genre, structure));
             Sequence sequence = Arranger.renderMixed(song, renderer);
             double seconds = WavRenderer.seconds(sequence, song.spec().tempo(), GAP_SECONDS);
             entries.add(new Entry(song, sequence, t, seconds));

@@ -78,7 +78,9 @@ public final class Presets {
                             .structures(Weighted.of(VERSE_CHORUS, 1.0).and(ABAB, 1.0).and(INTRO_LOOP_OUTRO, 1.0))
                             .instruments(Weighted.of(new Instruments(BRASS, OVERDRIVE_GUITAR, FINGER_BASS), 3.0)
                                     .and(new Instruments(BRASS, PIANO, FINGER_BASS, TROMBONE), 1.5)
-                                    .and(new Instruments(TRUMPET, PIANO, FINGER_BASS, FRENCH_HORN), 0.5))
+                                    .and(new Instruments(TRUMPET, PIANO, FINGER_BASS, FRENCH_HORN), 0.5)
+                                    // Twin saw-wave synths over piano: an 80s/90s game-synth color, not the default.
+                                    .and(new Instruments(SAW_LEAD, PIANO, FINGER_BASS, SAW_LEAD), 1.0))
                             .groove(Groove.ROCK)
                             .harmony(HarmonyStyle.MODAL)
                             .build())),

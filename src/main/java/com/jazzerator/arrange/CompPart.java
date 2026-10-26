@@ -56,6 +56,10 @@ final class CompPart {
         int beatsPerBar = song.spec().beatsPerBar();
         Groove.CompStyle style = articulation(groove.comp(), song.spec().instruments().comp());
         List<int[]> voicings = planVoicings(song, upperVoices);
+        if (Instruments.isKeyboard(song.spec().instruments().comp())) {
+            PianoPart.render(song, groove, track, channel, timing, rng, voicings); // a piano gets a role, not a pad
+            return;
+        }
         int index = 0;
         for (Section section : song.sections()) {
             for (ChordSlot slot : section.chords()) {
